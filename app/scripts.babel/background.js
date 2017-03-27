@@ -16,29 +16,34 @@
 // found in the LICENSE file.
 
 var attachedTabs = {};
+var tabsContent = {};
 var version = '1.0';
-var scriptsContent = null;
 
 chrome.debugger.onEvent.addListener(onEvent);
 chrome.debugger.onDetach.addListener(onDetach);
 
 chrome.browserAction.onClicked.addListener(function(tab) {
-  if (!scriptsContent) {
-    chrome.tabs.sendMessage(tab.id, {action: 'get_scripts_content'});
+  var tabId = tab.id;
+  if (!tabsContent[tabId]) {
+    chrome.tabs.sendMessage(tab.id, {action: 'get_tab_content'});
   } else {
-    toggleDebugger(tab);
+    toggleDebugger(tabId);
   }
 });
 
 chrome.runtime.onMessage.addListener(function(request, sender) {
-  if (request.type == 'scripts_content') {
-    scriptsContent = request.scriptsContent;
-    toggleDebugger(sender.tab);
+  var tabId = sender.tab.id;
+  if (request.type == 'tab_content') {
+    tabsContent[tabId] = request.tabContent;
+    var scriptsContent = request.tabContent.scriptsContent;
+    var paths = _.map(scriptsContent, (content)=>{
+      return content.path;
+    });
+    toggleDebugger(tabId);
   }
 });
 
-function toggleDebugger(tab){
-  var tabId = tab.id;
+function toggleDebugger(tabId){
   var debuggeeId = {tabId:tabId};
 
   if (attachedTabs[tabId] == 'pausing')
