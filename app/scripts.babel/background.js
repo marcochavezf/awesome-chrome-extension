@@ -27,9 +27,12 @@ chrome.runtime.onMessage.addListener(function(request, sender) {
   if (request.type == 'tab_content') {
     tabsContent[tabId] = request.tabContent;
     var projectStructure = getProjectStructure(request.tabContent);
-    //TODO: parse this structure
-    debugger;
-    toggleDebugger(tabId);
+    angularEsprimaFun.createSemanticsFromSrc({
+      pathAndSrcFiles: projectStructure.srcContent
+    }, function(projectSemantics){
+      debugger;
+      toggleDebugger(tabId);
+    });
   }
 });
 
