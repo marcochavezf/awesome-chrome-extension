@@ -12,6 +12,8 @@ chrome.debugger.onDetach.addListener(onDetach);
 
 chrome.browserAction.onClicked.addListener(function(tab) {
   var tabId = tab.id;
+  toggleDebugger(tabId);
+  /*
   if (!tabsContent[tabId]) {
     chrome.browserAction.setIcon({tabId: tabId, path:'images/debuggerPausing.png'});
     chrome.browserAction.setTitle({tabId: tabId, title:'Pausing JavaScript'});
@@ -20,6 +22,7 @@ chrome.browserAction.onClicked.addListener(function(tab) {
   } else {
     toggleDebugger(tabId);
   }
+  */
 });
 
 chrome.runtime.onMessage.addListener(function(request, sender) {
@@ -30,8 +33,11 @@ chrome.runtime.onMessage.addListener(function(request, sender) {
     angularEsprimaFun.createSemanticsFromSrc({
       pathAndSrcFiles: projectStructure.srcContent
     }, function(projectSemantics){
+      console.log(projectSemantics);
+      chrome.browserAction.setIcon({tabId:tabId, path:'images/record.png'});
+      chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
       debugger;
-      toggleDebugger(tabId);
+      //TODO: merge generated debugger data with project semantics
     });
   }
 });
@@ -106,10 +112,15 @@ function toggleDebugger(tabId){
   if (attachedTabs[tabId] == 'pausing')
     return;
 
-  if (!attachedTabs[tabId])
+  if (!attachedTabs[tabId]) {
     chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
-  else if (attachedTabs[tabId])
-    chrome.debugger.detach(debuggeeId, onDetach.bind(null, debuggeeId));
+  } else if (attachedTabs[tabId]) {
+    chrome.debugger.sendCommand(debuggeeId, 'Profiler.stop', function (profile) {
+      console.log(profile);
+      chrome.debugger.detach(debuggeeId, onDetach.bind(null, debuggeeId));
+      chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
+    });
+  }
 }
 
 function onAttach(debuggeeId) {
@@ -119,16 +130,16 @@ function onAttach(debuggeeId) {
   }
 
   var tabId = debuggeeId.tabId;
-  chrome.browserAction.setIcon({tabId: tabId, path:'images/debuggerPausing.png'});
-  chrome.browserAction.setTitle({tabId: tabId, title:'Pausing JavaScript'});
-  attachedTabs[tabId] = 'pausing';
+  chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
+  chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project'});
+  attachedTabs[tabId] = 'recording';
   chrome.debugger.sendCommand(
-    debuggeeId, 'Debugger.enable', {},
+    debuggeeId, 'Profiler.enable', {},
     onDebuggerEnabled.bind(null, debuggeeId));
 }
 
 function onDebuggerEnabled(debuggeeId) {
-  chrome.debugger.sendCommand(debuggeeId, 'Debugger.pause');
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.start');
 }
 
 function onEvent(debuggeeId, method) {
@@ -143,6 +154,6 @@ function onEvent(debuggeeId, method) {
 function onDetach(debuggeeId) {
   var tabId = debuggeeId.tabId;
   delete attachedTabs[tabId];
-  chrome.browserAction.setIcon({tabId:tabId, path:'images/debuggerPause.png'});
-  chrome.browserAction.setTitle({tabId:tabId, title:'Pause JavaScript'});
+  chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
+  chrome.browserAction.setTitle({tabId:tabId, title:'Generating project structure'});
 }
