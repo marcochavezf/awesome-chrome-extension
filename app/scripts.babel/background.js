@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-var attachedTabs = {};
+var statusAttachedTabs = {};
 var tabsContent = {};
 var version = '1.0';
 
@@ -12,35 +12,48 @@ chrome.debugger.onDetach.addListener(onDetach);
 
 chrome.browserAction.onClicked.addListener(function(tab) {
   var tabId = tab.id;
-  toggleDebugger(tabId);
-  /*
-  if (!tabsContent[tabId]) {
-    chrome.browserAction.setIcon({tabId: tabId, path:'images/debuggerPausing.png'});
-    chrome.browserAction.setTitle({tabId: tabId, title:'Pausing JavaScript'});
+  var debuggeeId = {tabId:tabId};
 
-    chrome.tabs.sendMessage(tab.id, {action: 'get_tab_content'});
-  } else {
-    toggleDebugger(tabId);
+  if (statusAttachedTabs[tabId] == 'stoping' || statusAttachedTabs[tabId] == 'generating_project')
+    return;
+
+  tabsContent[tabId] = {};
+
+  if (!statusAttachedTabs[tabId]) {
+    chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
+  } else if (statusAttachedTabs[tabId]) {
+    statusAttachedTabs[tabId] = 'stoping';
+    chrome.debugger.sendCommand(debuggeeId, 'Profiler.stop', function (profile) {
+      tabsContent[tabId].profile = profile;
+      chrome.debugger.detach(debuggeeId, onDetach.bind(null, debuggeeId));
+    });
   }
-  */
 });
 
 chrome.runtime.onMessage.addListener(function(request, sender) {
   var tabId = sender.tab.id;
   if (request.type == 'tab_content') {
-    tabsContent[tabId] = request.tabContent;
+    statusAttachedTabs[tabId] = 'generating_project';
+    tabsContent[tabId].tabContent = request.tabContent;
     var projectStructure = getProjectStructure(request.tabContent);
     angularEsprimaFun.createSemanticsFromSrc({
       pathAndSrcFiles: projectStructure.srcContent
     }, function(projectSemantics){
-      console.log(projectSemantics);
-      chrome.browserAction.setIcon({tabId:tabId, path:'images/record.png'});
-      chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
+      tabsContent[tabId].projectSemantics = projectSemantics;
+      console.log(tabsContent[tabId]);
+      resetToStartState(tabId);
       debugger;
       //TODO: merge generated debugger data with project semantics
     });
   }
 });
+
+function resetToStartState(tabId){
+  chrome.browserAction.setIcon({tabId:tabId, path:'images/record.png'});
+  chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
+  delete tabsContent[tabId];
+  delete statusAttachedTabs[tabId];
+}
 
 function getProjectStructure(tabContent) {
   var scriptsContent = tabContent.scriptsContent;
@@ -106,23 +119,6 @@ function getProjectStructure(tabContent) {
   return { srcContent, thirdPartyContent };
 }
 
-function toggleDebugger(tabId){
-  var debuggeeId = {tabId:tabId};
-
-  if (attachedTabs[tabId] == 'pausing')
-    return;
-
-  if (!attachedTabs[tabId]) {
-    chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
-  } else if (attachedTabs[tabId]) {
-    chrome.debugger.sendCommand(debuggeeId, 'Profiler.stop', function (profile) {
-      console.log(profile);
-      chrome.debugger.detach(debuggeeId, onDetach.bind(null, debuggeeId));
-      chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
-    });
-  }
-}
-
 function onAttach(debuggeeId) {
   if (chrome.runtime.lastError) {
     alert(chrome.runtime.lastError.message);
@@ -132,7 +128,7 @@ function onAttach(debuggeeId) {
   var tabId = debuggeeId.tabId;
   chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
   chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project'});
-  attachedTabs[tabId] = 'recording';
+  statusAttachedTabs[tabId] = 'recording';
   chrome.debugger.sendCommand(
     debuggeeId, 'Profiler.enable', {},
     onDebuggerEnabled.bind(null, debuggeeId));
@@ -145,7 +141,7 @@ function onDebuggerEnabled(debuggeeId) {
 function onEvent(debuggeeId, method) {
   var tabId = debuggeeId.tabId;
   if (method == 'Debugger.paused') {
-    attachedTabs[tabId] = 'paused';
+    statusAttachedTabs[tabId] = 'paused';
     chrome.browserAction.setIcon({tabId:tabId, path:'images/debuggerContinue.png'});
     chrome.browserAction.setTitle({tabId:tabId, title:'Resume JavaScript'});
   }
@@ -153,7 +149,19 @@ function onEvent(debuggeeId, method) {
 
 function onDetach(debuggeeId) {
   var tabId = debuggeeId.tabId;
-  delete attachedTabs[tabId];
   chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
   chrome.browserAction.setTitle({tabId:tabId, title:'Generating project structure'});
+  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
+
+  var tenSeconds = 10 * 1000;
+  setTimeout(function(){
+    if (statusAttachedTabs[tabId] === 'stoping') {
+      var problemMessage = 'There was a problem to get scripts content, please refresh the tab and click in "Record" button again. Do you want to refresh the tab?';
+      if (confirm(problemMessage)) {
+        var code = 'window.location.reload();';
+        chrome.tabs.executeScript(tabId, {code: code});
+      }
+      resetToStartState(tabId);
+    }
+  }, tenSeconds)
 }
