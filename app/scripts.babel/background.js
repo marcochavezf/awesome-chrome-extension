@@ -14,13 +14,18 @@ chrome.browserAction.onClicked.addListener(function(tab) {
   var tabId = tab.id;
   var debuggeeId = {tabId:tabId};
 
-  if (statusAttachedTabs[tabId] == 'stoping' || statusAttachedTabs[tabId] == 'generating_project')
-    return;
+  switch (statusAttachedTabs[tabId]) {
+    case 'checking_contentscript':
+    case 'stoping':
+    case 'generating_project':
+    case 'enabling_debugger':
+      return;
+  }
 
   tabsContent[tabId] = {};
 
   if (!statusAttachedTabs[tabId]) {
-    chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
+    initializeDebugger(tabId);
   } else if (statusAttachedTabs[tabId]) {
     statusAttachedTabs[tabId] = 'stoping';
     chrome.debugger.sendCommand(debuggeeId, 'Profiler.stop', function (profile) {
@@ -32,21 +37,50 @@ chrome.browserAction.onClicked.addListener(function(tab) {
 
 chrome.runtime.onMessage.addListener(function(request, sender) {
   var tabId = sender.tab.id;
-  if (request.type == 'tab_content') {
-    statusAttachedTabs[tabId] = 'generating_project';
-    tabsContent[tabId].tabContent = request.tabContent;
-    var projectStructure = getProjectStructure(request.tabContent);
-    angularEsprimaFun.createSemanticsFromSrc({
-      pathAndSrcFiles: projectStructure.srcContent
-    }, function(projectSemantics){
-      tabsContent[tabId].projectSemantics = projectSemantics;
-      console.log(tabsContent[tabId]);
-      resetToStartState(tabId);
-      debugger;
-      //TODO: merge generated debugger data with project semantics
-    });
+
+  switch (request.type) {
+    case 'tab_content':
+      statusAttachedTabs[tabId] = 'generating_project';
+      tabsContent[tabId].tabContent = request.tabContent;
+      var projectStructure = getProjectStructure(request.tabContent);
+      angularEsprimaFun.createSemanticsFromSrc({
+        pathAndSrcFiles: projectStructure.srcContent
+      }, function (projectSemantics) {
+        tabsContent[tabId].projectSemantics = projectSemantics;
+        console.log(tabsContent[tabId]);
+        debugger;
+        //TODO: merge generated debugger data with project semantics
+        resetToStartState(tabId);
+      });
+      break;
+
+    case 'ack':
+      statusAttachedTabs[tabId] = 'enabling_debugger';
+      var debuggeeId = {tabId:tabId};
+      chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
+      break;
   }
 });
+
+function initializeDebugger(tabId){
+  statusAttachedTabs[tabId] = 'checking_contentscript';
+  chrome.tabs.sendMessage(tabId, {action: 'ack'});
+  var oneSecond = 1000;
+  setTimeout(function(){
+    if (statusAttachedTabs[tabId] === 'checking_contentscript') {
+      confirmRestartTab(tabId);
+    }
+  }, oneSecond)
+}
+
+function confirmRestartTab(tabId){
+  var problemMessage = 'There was a problem to get scripts content, please refresh the tab and click in "Record" button again. Do you want to refresh the tab?';
+  if (confirm(problemMessage)) {
+    var code = 'window.location.reload();';
+    chrome.tabs.executeScript(tabId, {code: code});
+  }
+  resetToStartState(tabId);
+}
 
 function resetToStartState(tabId){
   chrome.browserAction.setIcon({tabId:tabId, path:'images/record.png'});
@@ -156,12 +190,7 @@ function onDetach(debuggeeId) {
   var tenSeconds = 10 * 1000;
   setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'stoping') {
-      var problemMessage = 'There was a problem to get scripts content, please refresh the tab and click in "Record" button again. Do you want to refresh the tab?';
-      if (confirm(problemMessage)) {
-        var code = 'window.location.reload();';
-        chrome.tabs.executeScript(tabId, {code: code});
-      }
-      resetToStartState(tabId);
+      confirmRestartTab(tabId);
     }
   }, tenSeconds)
 }

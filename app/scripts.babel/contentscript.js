@@ -1,17 +1,27 @@
 'use strict';
 
 chrome.extension.onMessage.addListener(function (msg, sender, sendResponse) {
-  if (msg.action == 'get_tab_content') {
-    getScriptsContent()
-      .then(function(values){
-        var tabContent = {
-          location: Object.assign({}, window.location),
-          scriptsContent: values
-        };
-        chrome.runtime.sendMessage({type: 'tab_content', tabContent: tabContent });
-      })
+  switch (msg.action) {
+    case 'get_tab_content':
+      getTabContent();
+      break;
+
+    case 'ack':
+      chrome.runtime.sendMessage({type: 'ack', msg: 'ACK received' });
+      break;
   }
 });
+
+function getTabContent(){
+  getScriptsContent()
+    .then(function(values){
+      var tabContent = {
+        location: Object.assign({}, window.location),
+        scriptsContent: values
+      };
+      chrome.runtime.sendMessage({type: 'tab_content', tabContent: tabContent });
+    })
+}
 
 /* We wrap this function just in case we need another library instead of jQuery */
 function httpGet(script) {
