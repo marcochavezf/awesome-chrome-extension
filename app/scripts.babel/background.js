@@ -83,7 +83,7 @@ function confirmRestartTab(tabId){
 }
 
 function resetToStartState(tabId){
-  chrome.browserAction.setIcon({tabId:tabId, path:'images/record.png'});
+  chrome.browserAction.setIcon({tabId:tabId, path:'images/record-ng.png'});
   chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
   delete tabsContent[tabId];
   delete statusAttachedTabs[tabId];
@@ -163,12 +163,11 @@ function onAttach(debuggeeId) {
   chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
   chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project'});
   statusAttachedTabs[tabId] = 'recording';
-  chrome.debugger.sendCommand(
-    debuggeeId, 'Profiler.enable', {},
-    onDebuggerEnabled.bind(null, debuggeeId));
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.enable', {}, onDebuggerEnabled.bind(null, debuggeeId));
 }
 
 function onDebuggerEnabled(debuggeeId) {
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.setSamplingInterval', { interval: 100 });
   chrome.debugger.sendCommand(debuggeeId, 'Profiler.start');
 }
 
