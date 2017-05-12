@@ -27,7 +27,12 @@ chrome.browserAction.onClicked.addListener(function(tab) {
   if (!statusAttachedTabs[tabId]) {
     initializeDebugger(tabId);
   } else if (statusAttachedTabs[tabId]) {
+    var manager_url = chrome.extension.getURL('manager.html');
+    focusOrCreateTab(manager_url, tabId);
+
     statusAttachedTabs[tabId] = 'stoping';
+    updateManagerStatus('Loading...', tabId);
+
     chrome.debugger.sendCommand(debuggeeId, 'Profiler.stop', function (profile) {
       tabsContent[tabId].profile = profile;
       chrome.debugger.detach(debuggeeId, onDetach.bind(null, debuggeeId));
@@ -41,30 +46,57 @@ chrome.runtime.onMessage.addListener(function(request, sender) {
   switch (request.type) {
     case 'tab_content':
       statusAttachedTabs[tabId] = 'generating_project';
+      updateManagerStatus('Generating project...', tabId);
+
       tabsContent[tabId].tabContent = request.tabContent;
       var projectStructure = getProjectStructure(request.tabContent);
       angularEsprimaFun.createSemanticsFromSrc({
         pathAndSrcFiles: projectStructure.srcContent
       }, function (projectSemantics) {
+        updateManagerStatus('Getting profile nodes..', tabId);
+
         tabsContent[tabId].projectSemantics = projectSemantics;
-        console.log(tabsContent[tabId]);
-        debugger;
-        //TODO: merge generated debugger data with project semantics
-        resetToStartState(tabId);
+        var pathToFilter = tabsContent[tabId].tabContent.location.href + projectStructure.srcFolder;
+        angularEsprimaFun.getProjectNodesFromProfile({
+          cpuProfileJson: tabsContent[tabId].profile.profile,
+          pathToFilter: pathToFilter
+        }, function(projectNodes){
+          console.log(projectNodes);
+          console.log(tabsContent[tabId]);
+          chrome.runtime.sendMessage({action: 'data', content: tabsContent[tabId] }, function(response){
+            chrome.tabs.update(tabsContent[tabId].managerTab.id, {'selected':true});
+            debugger;
+            //TODO: merge generated debugger data with project semantics
+            console.log(response);
+            resetToStartState(tabId);
+          });
+        });
       });
       break;
 
     case 'ack':
       statusAttachedTabs[tabId] = 'enabling_debugger';
+      updateManagerStatus('Enabling debugger...', tabId);
+
       var debuggeeId = {tabId:tabId};
       chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
       break;
   }
 });
 
+function updateManagerStatus(status, tabId){
+  chrome.runtime.sendMessage({action: 'update_status', status: status}, function(response){
+    console.log(response);
+  });
+}
+
 function initializeDebugger(tabId){
   statusAttachedTabs[tabId] = 'checking_contentscript';
-  chrome.tabs.sendMessage(tabId, {action: 'ack'});
+  updateManagerStatus('Checking content script...', tabId);
+  
+  chrome.tabs.sendMessage(tabId, {action: 'ack'}, function(response){
+    console.log(response);
+  });
   var oneSecond = 1000;
   setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'checking_contentscript') {
@@ -150,19 +182,29 @@ function getProjectStructure(tabContent) {
     }
   });
 
-  return { srcContent, thirdPartyContent };
+  return { srcFolder, srcContent, thirdPartyContent };
 }
 
 function onAttach(debuggeeId) {
+  var tabId = debuggeeId.tabId;
+
   if (chrome.runtime.lastError) {
-    alert(chrome.runtime.lastError.message);
+    var errorMsg = chrome.runtime.lastError.message;
+    var debuggerMsg = 'Another debugger is already attached';
+    if (errorMsg.indexOf(debuggerMsg) >= 0) {
+      alert(debuggerMsg + ' to this tab, please close the debugger and try again.');
+    } else {
+      alert(errorMsg);
+    }
+    resetToStartState(tabId);
     return;
   }
 
-  var tabId = debuggeeId.tabId;
   chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
   chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project'});
   statusAttachedTabs[tabId] = 'recording';
+  updateManagerStatus('Recording...', tabId);
+  
   chrome.debugger.sendCommand(debuggeeId, 'Profiler.enable', {}, onDebuggerEnabled.bind(null, debuggeeId));
 }
 
@@ -175,6 +217,8 @@ function onEvent(debuggeeId, method) {
   var tabId = debuggeeId.tabId;
   if (method == 'Debugger.paused') {
     statusAttachedTabs[tabId] = 'paused';
+    updateManagerStatus('Paused...', tabId);
+
     chrome.browserAction.setIcon({tabId:tabId, path:'images/debuggerContinue.png'});
     chrome.browserAction.setTitle({tabId:tabId, title:'Resume JavaScript'});
   }
@@ -184,7 +228,9 @@ function onDetach(debuggeeId) {
   var tabId = debuggeeId.tabId;
   chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
   chrome.browserAction.setTitle({tabId:tabId, title:'Generating project structure'});
-  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
+  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'}, function(response){
+    console.log(response);
+  });
 
   var tenSeconds = 10 * 1000;
   setTimeout(function(){
@@ -192,4 +238,28 @@ function onDetach(debuggeeId) {
       confirmRestartTab(tabId);
     }
   }, tenSeconds)
+}
+
+function focusOrCreateTab(url, tabId) {
+  chrome.windows.getAll({'populate':true}, function(windows) {
+    var existing_tab = null;
+    for (var i in windows) {
+      var tabs = windows[i].tabs;
+      for (var j in tabs) {
+        var tab = tabs[j];
+        if (tab.url == url) {
+          existing_tab = tab;
+          break;
+        }
+      }
+    }
+    if (existing_tab) {
+      tabsContent[tabId].managerTab = existing_tab;
+      chrome.tabs.update(existing_tab.id, {'selected':true});
+    } else {
+      chrome.tabs.create({'url':url, 'selected':true}, function(tab){
+        tabsContent[tabId].managerTab = tab;
+      });
+    }
+  });
 }

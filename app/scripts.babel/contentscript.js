@@ -3,7 +3,7 @@
 chrome.extension.onMessage.addListener(function (msg, sender, sendResponse) {
   switch (msg.action) {
     case 'get_tab_content':
-      getTabContent();
+      getTabContent(sendResponse);
       break;
 
     case 'ack':
@@ -12,13 +12,14 @@ chrome.extension.onMessage.addListener(function (msg, sender, sendResponse) {
   }
 });
 
-function getTabContent(){
+function getTabContent(sendResponse){
   getScriptsContent()
     .then(function(values){
       var tabContent = {
         location: Object.assign({}, window.location),
         scriptsContent: values
       };
+      //sendResponse(tabContent);
       chrome.runtime.sendMessage({type: 'tab_content', tabContent: tabContent });
     })
 }

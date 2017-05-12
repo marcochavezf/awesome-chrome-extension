@@ -1148,10 +1148,99 @@ var formatter = require('./helpers/formatter');
  */
 module.exports = {
   createProjectSemantics: createProjectSemantics,
-  createSemanticsFromSrc: createSemanticsFromSrc
+  createSemanticsFromSrc: createSemanticsFromSrc,
+  getProjectNodesFromProfile: getProjectNodesFromProfile
 };
 
 ///////////////
+
+function getProjectNodesFromProfile(params, callback) {
+  var cpuProfileJson = params.cpuProfileJson;
+  var cpuProfilePath = params.cpuProfilePath;
+  var pathToFilter = params.pathToFilter;
+  var pathOutput = params.pathOutput;
+
+  if (params.cpuProfilePath) {
+    var cpuProfileText = fs.readFileSync(cpuProfilePath, 'utf8');
+    cpuProfileJson = JSON.parse(cpuProfileText);
+  }
+
+  var chainedAllFunctions = [];
+  _.each(cpuProfileJson.nodes, function (functionNode) {
+    functionNode.childrenNodes = [];
+    var doesFnNodeBelongTo = addFunctionToChainedFunctions(chainedAllFunctions, functionNode);
+
+    //If the 'functionNode' wasn't able to be added, then add it to 'chainedFunctions' (root)
+    if (!doesFnNodeBelongTo) {
+      chainedAllFunctions.push(functionNode);
+    }
+  });
+
+  if (pathOutput) {
+    fs.writeFile(pathOutput + '/chained_functions.json', JSON.stringify(chainedAllFunctions, null, 2), function (error) {
+      if (error) {
+        callback(null, error);
+      }
+    });
+  }
+
+  //filter project node functions
+  var projectNodes = filterProjectNodes(chainedAllFunctions, pathToFilter);
+
+  if (pathOutput) {
+    fs.writeFile(pathOutput + '/project_nodes.json', JSON.stringify(projectNodes, null, 2), function (error) {
+      if (error) {
+        callback(null, error);
+      }
+    });
+  }
+
+  callback(projectNodes);
+}
+
+function filterProjectNodes(nodeFunctions, pathToFilter) {
+  var newNodeFnArray = [];
+
+  _.each(nodeFunctions, function (nodeFunction) {
+
+    var isAProjectFile = _.startsWith(nodeFunction.callFrame.url, pathToFilter);
+    if (isAProjectFile) {
+
+      newNodeFnArray.push(nodeFunction);
+      nodeFunction.childrenNodes = filterProjectNodes(nodeFunction.childrenNodes, pathToFilter);
+    } else {
+
+      var projectNodes = filterProjectNodes(nodeFunction.childrenNodes, pathToFilter);
+
+      _.each(projectNodes, function (projectNode) {
+        newNodeFnArray.push(projectNode);
+      });
+    }
+  });
+
+  return newNodeFnArray;
+}
+
+function addFunctionToChainedFunctions(chainedFunctions, functionNode) {
+  //1. Check 'children' of each chained function,
+  //   if one of those  match with function node then add it to 'childrenNodes' array
+  var doesFnNodeBelongTo = _.find(chainedFunctions, function (chainedFn) {
+
+    var doesFnNodeBelongTo = _.find(chainedFn.children, function (idChild) {
+      return idChild === functionNode.id;
+    });
+
+    if (doesFnNodeBelongTo) {
+      chainedFn.childrenNodes.push(functionNode);
+      return doesFnNodeBelongTo;
+    }
+
+    //2. If 'functionNode' doesn't belong to 'chainedFn.children' then repeat step 1 with each 'childrenNodes'
+    return addFunctionToChainedFunctions(chainedFn.childrenNodes, functionNode);
+  });
+
+  return doesFnNodeBelongTo;
+}
 
 function createProjectSemantics(dir, callback, enableVerbose) {
   var walker = walk.walk(dir, { followLinks: false });
