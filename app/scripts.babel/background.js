@@ -247,7 +247,7 @@ function focusOrCreateTab(url, tabId) {
       var tabs = windows[i].tabs;
       for (var j in tabs) {
         var tab = tabs[j];
-        if (tab.url == url) {
+        if (tab.url == url && tab.inspectedTabId == tabId) {
           existing_tab = tab;
           break;
         }
@@ -258,6 +258,7 @@ function focusOrCreateTab(url, tabId) {
       chrome.tabs.update(existing_tab.id, {'selected':true});
     } else {
       chrome.tabs.create({'url':url, 'selected':true}, function(tab){
+        tab.inspectedTabId = tabId;
         tabsContent[tabId].managerTab = tab;
       });
     }
