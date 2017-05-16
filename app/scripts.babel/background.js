@@ -10,16 +10,68 @@ var version = '1.0';
 chrome.debugger.onEvent.addListener(onEvent);
 chrome.debugger.onDetach.addListener(onDetach);
 
+chrome.tabs.onCreated.addListener(function(tab){
+  var tabId = tab.id;
+  if (isAChromeExtensionTab(tab)){
+    setTimeout(function() {
+      chrome.browserAction.disable(tabId);
+    }, 500);
+  }
+});
+chrome.windows.getAll({'populate':true}, function(windows) {
+  var existing_tab = null;
+  for (var i in windows) {
+    var tabs = windows[i].tabs;
+    for (var j in tabs) {
+      var tab = tabs[j];
+      if (isAChromeExtensionTab(tab)){
+        chrome.browserAction.disable(tab.id);
+      }
+    }
+  }
+});
+
+function isAChromeExtensionTab(tab){
+  var url = tab.url;
+  return  url.indexOf('chrome-extension://') >= 0
+       || url.indexOf('chrome://extensions/') >= 0;
+}
+
 chrome.browserAction.onClicked.addListener(function(tab) {
+  if (tab.url.indexOf('chrome://newtab') >= 0) {
+    return alert('This tab doesn\'t have content to be processed');
+  }
+
+  if (isAChromeExtensionTab(tab)) {
+    chrome.browserAction.disable(tab.id);
+    return alert('This tab can\'t be processed');
+  }
+
   var tabId = tab.id;
   var debuggeeId = {tabId:tabId};
 
-  switch (statusAttachedTabs[tabId]) {
-    case 'checking_contentscript':
-    case 'stoping':
-    case 'generating_project':
-    case 'enabling_debugger':
-      return;
+  for (var statusTabId in statusAttachedTabs) {
+    var status = statusAttachedTabs[statusTabId];
+    var isAnotherTab = parseInt(statusTabId) !== tabId;
+    var isAnotherTabBusy = isBusy(status) || status === 'recording';
+    if (isAnotherTab && isAnotherTabBusy) {
+      return alert('Another tab is being processed');
+    }
+  }
+
+  var status = statusAttachedTabs[tabId];
+  if (isBusy(status)) {
+    if (tabsContent[tabId].managerTab) {
+      chrome.tabs.update(tabsContent[tabId].managerTab.id, {'selected': true});
+    } else {
+      chrome.notifications.create('notification-tabId-'+ tabId, {
+        type: 'basic',
+        title: 'Loading...',
+        message: 'Please wait',
+        iconUrl: 'images/ripple.gif'
+      }, function() {});
+    }
+    return;
   }
 
   tabsContent[tabId] = {};
@@ -40,38 +92,12 @@ chrome.browserAction.onClicked.addListener(function(tab) {
   }
 });
 
-chrome.runtime.onMessage.addListener(function(request, sender) {
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   var tabId = sender.tab.id;
 
   switch (request.type) {
     case 'tab_content':
-      statusAttachedTabs[tabId] = 'generating_project';
-      updateManagerStatus('Generating project...', tabId);
-
-      tabsContent[tabId].tabContent = request.tabContent;
-      var projectStructure = getProjectStructure(request.tabContent);
-      angularEsprimaFun.createSemanticsFromSrc({
-        pathAndSrcFiles: projectStructure.srcContent
-      }, function (projectSemantics) {
-        updateManagerStatus('Getting profile nodes..', tabId);
-
-        tabsContent[tabId].projectSemantics = projectSemantics;
-        var pathToFilter = tabsContent[tabId].tabContent.location.href + projectStructure.srcFolder;
-        angularEsprimaFun.getProjectNodesFromProfile({
-          cpuProfileJson: tabsContent[tabId].profile.profile,
-          pathToFilter: pathToFilter
-        }, function(projectNodes){
-          console.log(projectNodes);
-          console.log(tabsContent[tabId]);
-          chrome.runtime.sendMessage({action: 'data', content: tabsContent[tabId] }, function(response){
-            chrome.tabs.update(tabsContent[tabId].managerTab.id, {'selected':true});
-            debugger;
-            //TODO: merge generated debugger data with project semantics
-            console.log(response);
-            resetToStartState(tabId);
-          });
-        });
-      });
+      processTabContent(request.tabContent, tabId);
       break;
 
     case 'ack':
@@ -82,21 +108,60 @@ chrome.runtime.onMessage.addListener(function(request, sender) {
       chrome.debugger.attach(debuggeeId, version, onAttach.bind(null, debuggeeId));
       break;
   }
+
+  sendResponse('received');
 });
 
-function updateManagerStatus(status, tabId){
-  chrome.runtime.sendMessage({action: 'update_status', status: status}, function(response){
-    console.log(response);
+function isBusy(status){
+  switch(status){
+    case 'checking_contentscript':
+    case 'stoping':
+    case 'generating_project':
+    case 'enabling_debugger':
+      return true;
+  }
+  return false;
+}
+
+function processTabContent(tabContent, tabId){
+  statusAttachedTabs[tabId] = 'generating_project';
+  updateManagerStatus('Generating project...', tabId);
+
+  tabsContent[tabId].tabContent = tabContent;
+  var projectStructure = getProjectStructure(tabContent);
+  angularEsprimaFun.createSemanticsFromSrc({
+    pathAndSrcFiles: projectStructure.srcContent
+  }, function (projectSemantics) {
+    updateManagerStatus('Getting profile nodes..', tabId);
+
+    tabsContent[tabId].projectSemantics = projectSemantics;
+    var pathToFilter = tabsContent[tabId].tabContent.location.href + projectStructure.srcFolder;
+    angularEsprimaFun.getProjectNodesFromProfile({
+      cpuProfileJson: tabsContent[tabId].profile.profile,
+      pathToFilter: pathToFilter
+    }, function(projectNodes){
+      tabsContent[tabId].projectNodes = projectNodes;
+      renderDataInManagerTab(tabId);
+    });
   });
+}
+
+function renderDataInManagerTab(tabId) {
+  chrome.runtime.sendMessage({action: 'data', tabContent: tabsContent[tabId] }, function(response){
+    chrome.tabs.update(tabsContent[tabId].managerTab.id, {'selected':true});
+    resetToStartState(tabId);
+  });
+}
+
+function updateManagerStatus(status, tabId){
+  chrome.runtime.sendMessage({action: 'update_status', status: status});
 }
 
 function initializeDebugger(tabId){
   statusAttachedTabs[tabId] = 'checking_contentscript';
   updateManagerStatus('Checking content script...', tabId);
   
-  chrome.tabs.sendMessage(tabId, {action: 'ack'}, function(response){
-    console.log(response);
-  });
+  chrome.tabs.sendMessage(tabId, {action: 'ack'});
   var oneSecond = 1000;
   setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'checking_contentscript') {
@@ -201,7 +266,7 @@ function onAttach(debuggeeId) {
   }
 
   chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
-  chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project'});
+  chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project...'});
   statusAttachedTabs[tabId] = 'recording';
   updateManagerStatus('Recording...', tabId);
   
@@ -216,21 +281,15 @@ function onDebuggerEnabled(debuggeeId) {
 function onEvent(debuggeeId, method) {
   var tabId = debuggeeId.tabId;
   if (method == 'Debugger.paused') {
-    statusAttachedTabs[tabId] = 'paused';
-    updateManagerStatus('Paused...', tabId);
-
-    chrome.browserAction.setIcon({tabId:tabId, path:'images/debuggerContinue.png'});
-    chrome.browserAction.setTitle({tabId:tabId, title:'Resume JavaScript'});
+    debugger;
   }
 }
 
 function onDetach(debuggeeId) {
   var tabId = debuggeeId.tabId;
   chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
-  chrome.browserAction.setTitle({tabId:tabId, title:'Generating project structure'});
-  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'}, function(response){
-    console.log(response);
-  });
+  chrome.browserAction.setTitle({tabId:tabId, title:'Getting tab content...'});
+  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
 
   var tenSeconds = 10 * 1000;
   setTimeout(function(){
@@ -247,7 +306,7 @@ function focusOrCreateTab(url, tabId) {
       var tabs = windows[i].tabs;
       for (var j in tabs) {
         var tab = tabs[j];
-        if (tab.url == url && tab.inspectedTabId == tabId) {
+        if (tab.url == url) {
           existing_tab = tab;
           break;
         }
@@ -258,7 +317,6 @@ function focusOrCreateTab(url, tabId) {
       chrome.tabs.update(existing_tab.id, {'selected':true});
     } else {
       chrome.tabs.create({'url':url, 'selected':true}, function(tab){
-        tab.inspectedTabId = tabId;
         tabsContent[tabId].managerTab = tab;
       });
     }

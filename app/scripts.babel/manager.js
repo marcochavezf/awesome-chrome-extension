@@ -1,20 +1,31 @@
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  document.getElementById('status').innerHTML = 'Loading...';
+  var loading = document.getElementById('loading');
+  var content = document.getElementById('content');
+  var status = document.getElementById('status');
+  status.innerHTML = 'Loading...';
+  
   switch (msg.action) {
     case 'update_status':
-      console.log('update_status', msg, sender);
-      document.getElementById('status').innerHTML = msg.status;
+      loading.style.display = 'block';
+      content.style.display = 'none';
+      status.innerHTML = msg.status;
       break;
 
     case 'data':
-      document.getElementById('status').innerHTML = 'DATA RECEIVED!';
+      displayContent(content, msg.tabContent)
+      loading.style.display = 'none';
+      content.style.display = 'block';
       console.log('data', msg, sender);
       break;
   }
+
   sendResponse('received');
 });
 
+function displayContent(content, tabContent){
+  //TODO: merge generated debugger data with project semantics
+  content.innerHTML = 'Data received';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('status').innerHTML = 'Loading...';
-  debugger;
 });
