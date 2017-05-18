@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "lodash": "^4.17.4",
-    "jquery": "^3.2.1"
+    "jquery": "^3.2.1",
+    "jstree": "^3.3.4"
   }
 }

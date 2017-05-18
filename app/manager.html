@@ -1,8 +1,14 @@
 <html>
 <head>
-  <style>
-  </style>
-  <script src="scripts/manager.js"></script>
+  <meta charset="utf-8">
+  <!-- build:css styles/manager-vendor.css -->
+  <!-- bower:css -->
+  <link rel="stylesheet" href="bower_components/jstree/dist/themes/default/style.css" />
+  <!-- endbower -->
+  <!-- endbuild -->
+  <!-- build:css styles/main.css -->
+  <link href="styles/main.css" rel="stylesheet">
+  <!-- endbuild -->
 </head>
 <body>
   <h2>Awesome AngularJs Profiler</h2>
@@ -11,5 +17,30 @@
     <img src="images/ripple.gif" style="width:50px;">
   </div>
   <p id="content" style="display:none;"></p>
+
+  <div id="jstree">
+    <!-- in this example the tree is populated from inline HTML -->
+    <ul>
+      <li>Root node 1
+        <ul>
+          <li id="child_node_1">Child node 1</li>
+          <li>Child node 2</li>
+        </ul>
+      </li>
+      <li>Root node 2</li>
+    </ul>
+  </div>
+  <button>demo button</button>
+  <!-- build:js scripts/popup-vendor.js -->
+  <!-- bower:js -->
+  <script src="bower_components/lodash/lodash.js"></script>
+  <script src="bower_components/jquery/dist/jquery.js"></script>
+  <script src="bower_components/jstree/dist/jstree.js"></script>
+  <!-- endbower -->
+  <!-- endbuild -->
+
+  <!-- build:js scripts/manager.js -->
+  <script src="scripts/manager.js"></script>
+  <!-- endbuild -->
 </body>
 </html>
