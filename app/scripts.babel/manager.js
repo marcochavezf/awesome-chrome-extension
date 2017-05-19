@@ -3,6 +3,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   var content = document.getElementById('content');
   var status = document.getElementById('status');
   status.innerHTML = 'Loading...';
+  sendResponse('received');
   
   switch (msg.action) {
     case 'update_status':
@@ -18,29 +19,52 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       console.log('data', msg, sender);
       break;
   }
-
-  sendResponse('received');
 });
+
+function generateJstreeNodes(projectNodes) {
+  return _.map(projectNodes, function(projectNode){
+    var text = projectNode.callFrame.url;
+    return {
+      'text' : text,
+      'type' : 'controller',
+      'children' : generateJstreeNodes(projectNode.childrenNodes),
+      'data': _.omit(projectNode, ['childrenNodes'])
+    };
+  });
+}
 
 function displayContent(content, tabContent){
   //TODO: merge generated debugger data with project semantics
-  content.innerHTML = 'Data received';
+  var projectNodes = tabContent.projectNodes;
+  if (_.isEmpty(projectNodes)) {
+    content.innerHTML = 'No data registered';
+    return;
+  }
+
+  var ctlrsJstreeData = generateJstreeNodes(projectNodes);
+  var jstreeConfig = createJstreeConfig(ctlrsJstreeData);
+
+  content.innerHTML = '';
+  $('#code-nodes')
+    .on('select_node.jstree', function (e, data) {
+      console.log(e,data);
+    }).jstree(jstreeConfig);
+}
+
+function createJstreeConfig(data){
+  return {
+    'core' : {
+      'data' : data
+    },
+    'types' : {
+      'controller' : { 'icon' : './images/circle_red.png' },
+      'property' : { 'icon' : './images/circle_purple.png' },
+      'function' : { 'icon' : './images/circle_yellow.png' }
+    },
+    'plugins' : [ 'types' ]
+  };
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  $(function () {
-    // 6 create an instance when the DOM is ready
-    $('#jstree').jstree();
-    // 7 bind to events triggered on the tree
-    $('#jstree').on('changed.jstree', function (e, data) {
-      console.log(data.selected);
-    });
-    // 8 interact with the tree - either way is OK
-    $('button').on('click', function () {
-      debugger;
-      $('#jstree').jstree(true).select_node('child_node_1');
-      $('#jstree').jstree('select_node', 'child_node_1');
-      $.jstree.reference('#jstree').select_node('child_node_1');
-    });
-  });
+
 });

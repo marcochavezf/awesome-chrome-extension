@@ -10,6 +10,7 @@ chrome.extension.onMessage.addListener(function (msg, sender, sendResponse) {
       chrome.runtime.sendMessage({type: 'ack', msg: 'ACK received' });
       break;
   }
+  sendResponse('received');
 });
 
 function getTabContent(sendResponse){

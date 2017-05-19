@@ -160,14 +160,17 @@ function updateManagerStatus(status, tabId){
 function initializeDebugger(tabId){
   statusAttachedTabs[tabId] = 'checking_contentscript';
   updateManagerStatus('Checking content script...', tabId);
-  
-  chrome.tabs.sendMessage(tabId, {action: 'ack'});
+
   var oneSecond = 1000;
-  setTimeout(function(){
+  var timeout = setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'checking_contentscript') {
       confirmRestartTab(tabId);
     }
   }, oneSecond)
+
+  chrome.tabs.sendMessage(tabId, {action: 'ack'}, function(response){
+    clearTimeout(timeout);
+  });
 }
 
 function confirmRestartTab(tabId){
@@ -287,16 +290,18 @@ function onEvent(debuggeeId, method) {
 
 function onDetach(debuggeeId) {
   var tabId = debuggeeId.tabId;
-  chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
-  chrome.browserAction.setTitle({tabId:tabId, title:'Getting tab content...'});
-  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'});
-
   var tenSeconds = 10 * 1000;
-  setTimeout(function(){
+  var timeout = setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'stoping') {
       confirmRestartTab(tabId);
     }
-  }, tenSeconds)
+  }, tenSeconds);
+
+  chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
+  chrome.browserAction.setTitle({tabId:tabId, title:'Getting tab content...'});
+  chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'}, function(){
+    clearTimeout(timeout);
+  });
 }
 
 function focusOrCreateTab(url, tabId) {
