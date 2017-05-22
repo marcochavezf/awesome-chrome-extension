@@ -21,13 +21,19 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   }
 });
 
-function generateJstreeNodes(projectNodes) {
+function generateJstreeNodes(projectNodes, path) {
   return _.map(projectNodes, function(projectNode){
-    var text = projectNode.callFrame.url;
+    var callFrame = projectNode.callFrame;
+    var url = callFrame.url.replace(path, '');
+    var functionName = callFrame.functionName + '()';
+    if (_.isEmpty(callFrame.functionName)) {
+      functionName = 'Anonymous Fn';
+    }
+    var text = functionName + ' - ' + url + ':' + callFrame.lineNumber;
     return {
       'text' : text,
       'type' : 'controller',
-      'children' : generateJstreeNodes(projectNode.childrenNodes),
+      'children' : generateJstreeNodes(projectNode.childrenNodes, path),
       'data': _.omit(projectNode, ['childrenNodes'])
     };
   });
@@ -35,19 +41,26 @@ function generateJstreeNodes(projectNodes) {
 
 function displayContent(content, tabContent){
   //TODO: merge generated debugger data with project semantics
+  console.log(tabContent);
   var projectNodes = tabContent.projectNodes;
   if (_.isEmpty(projectNodes)) {
     content.innerHTML = 'No data registered';
     return;
   }
 
-  var ctlrsJstreeData = generateJstreeNodes(projectNodes);
+  var tabContent = tabContent.tabContent;
+  var path = tabContent.location.origin;
+
+  var ctlrsJstreeData = generateJstreeNodes(projectNodes, path);
   var jstreeConfig = createJstreeConfig(ctlrsJstreeData);
 
   content.innerHTML = '';
   $('#code-nodes')
     .on('select_node.jstree', function (e, data) {
       console.log(e,data);
+    })
+    .on('ready.jstree', function() {
+      $('#code-nodes').jstree('open_all');
     }).jstree(jstreeConfig);
 }
 
