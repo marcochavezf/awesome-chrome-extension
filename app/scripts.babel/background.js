@@ -148,8 +148,9 @@ function processTabContent(tabContent, tabId){
 
 function renderDataInManagerTab(tabId) {
   chrome.runtime.sendMessage({action: 'data', tabContent: tabsContent[tabId] }, function(response){
-    chrome.tabs.update(tabsContent[tabId].managerTab.id, {'selected':true});
+    var tabIdToUpdate = tabsContent[tabId].managerTab.id;
     resetToStartState(tabId);
+    chrome.tabs.update(tabIdToUpdate, {'selected':true});
   });
 }
 
@@ -169,7 +170,9 @@ function initializeDebugger(tabId){
   }, oneSecond)
 
   chrome.tabs.sendMessage(tabId, {action: 'ack'}, function(response){
-    clearTimeout(timeout);
+    if (response) {
+      clearTimeout(timeout);
+    }
   });
 }
 

@@ -3,6 +3,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   var content = document.getElementById('content');
   var status = document.getElementById('status');
   status.innerHTML = 'Loading...';
+  $('#code-nodes').jstree('destroy').empty();
   sendResponse('received');
   
   switch (msg.action) {
