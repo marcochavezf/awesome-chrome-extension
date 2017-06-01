@@ -280,7 +280,7 @@ function onAttach(debuggeeId) {
 }
 
 function onDebuggerEnabled(debuggeeId) {
-  chrome.debugger.sendCommand(debuggeeId, 'Profiler.setSamplingInterval', { interval: 100 });
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.setSamplingInterval', { interval: 50 });
   chrome.debugger.sendCommand(debuggeeId, 'Profiler.start');
 }
 
