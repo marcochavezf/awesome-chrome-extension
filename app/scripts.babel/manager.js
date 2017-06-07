@@ -177,7 +177,8 @@ function createJstreeConfig(data){
       'services' : { 'icon' : './images/circle_purple.png' },
       'directives' : { 'icon' : './images/circle_blue.png' },
       'filters' : { 'icon' : './images/circle_yellow.png' },
-      'none' : { 'icon' : './images/circle_orange.png' }
+      'none' : { 'icon' : './images/circle_orange.png' },
+      'default' : { 'icon' : './images/circle_orange.png' }
     },
     'plugins' : [ 'types' ]
   };
