@@ -135,7 +135,8 @@ function processTabContent(tabContent, tabId){
     updateManagerStatus('Getting profile nodes..', tabId);
 
     tabsContent[tabId].projectSemantics = projectSemantics;
-    var pathToFilter = tabsContent[tabId].tabContent.location.href + projectStructure.srcFolder;
+    var pathToFilter = tabsContent[tabId].tabContent.location.origin + '/' + projectStructure.srcFolder;
+
     angularEsprimaFun.getProjectNodesFromProfile({
       cpuProfileJson: tabsContent[tabId].profile.profile,
       pathToFilter: pathToFilter
@@ -221,13 +222,28 @@ function getProjectStructure(tabContent) {
   var angularContentWithShortestPath = null;
   for (var index = shortestLevel; index <= largestLevel; index++) {
     var scriptsContentByLevel = contentGroupedByLevel[index];
-    var fileWithAngular = _.find(scriptsContentByLevel, (content) => {
-      var isAngularFile = content.content.includes('angular.module');
-      var isGoogleProperty = content.content.includes('(c) 2010-2015 Google, Inc.');
-      return isAngularFile && !isGoogleProperty
+    var scriptsByProbability = _.groupBy(scriptsContentByLevel, (content) => {
+      return setProbabiltySrcFile(content.content);
     });
-    if (fileWithAngular) {
-      angularContentWithShortestPath = fileWithAngular;
+
+    var largestProbability = -1;
+    _.forIn(scriptsByProbability, function(value, key) {
+      var level = parseInt(key);
+      if (level > largestProbability) {
+        largestProbability = level;
+      }
+    });
+
+    //At least one of this scripts is candidate to be part of the src project.
+    if (largestProbability > 0) {
+
+      var scriptsWithHigerProbability = scriptsByProbability[largestProbability];
+      if (scriptsWithHigerProbability.lenght > 1) {
+        debugger;
+        //TODO: set another heuristic (probably at parse level) to compare these files (or ask to the user)
+      }
+
+      angularContentWithShortestPath = scriptsWithHigerProbability[0];
       break;
     }
   }
@@ -254,6 +270,47 @@ function getProjectStructure(tabContent) {
   });
 
   return { srcFolder, srcContent, thirdPartyContent };
+}
+
+function setProbabiltySrcFile(content){
+  var probability = 0;
+  if (content.includes('angular.module')) {
+    probability++;
+  }
+
+  if (content.includes('.config')) {
+    probability++;
+  }
+
+  if (content.includes('.run')) {
+    probability++;
+  }
+
+  if (content.includes('ngCordova')) {
+    probability++;
+  }
+
+  if (content.includes('ui.router')) {
+    probability++;
+  }
+
+  if (content.includes('import')) {
+    probability++;
+  }
+
+  if (content.includes('Google, Inc.')) {
+    probability--;
+  }
+
+  if (content.includes('Drifty Co.')) {
+    probability--;
+  }
+
+  if (content.includes('MIT')) {
+    probability--;
+  }
+
+  return probability;
 }
 
 function onAttach(debuggeeId) {
