@@ -222,8 +222,8 @@ function getProjectStructure(tabContent) {
   var angularContentWithShortestPath = null;
   for (var index = shortestLevel; index <= largestLevel; index++) {
     var scriptsContentByLevel = contentGroupedByLevel[index];
-    var scriptsByProbability = _.groupBy(scriptsContentByLevel, (content) => {
-      return setProbabiltySrcFile(content.content);
+    var scriptsByProbability = _.groupBy(scriptsContentByLevel, (fileContent) => {
+      return setProbabiltySrcFile(fileContent);
     });
 
     var largestProbability = -1;
@@ -272,10 +272,28 @@ function getProjectStructure(tabContent) {
   return { srcFolder, srcContent, thirdPartyContent };
 }
 
-function setProbabiltySrcFile(content){
+function setProbabiltySrcFile(fileContent){
+  var content = fileContent.content;
+  var pathArray = fileContent.path.split('/');
+  var pathFile = pathArray.length > 0 ? pathArray[pathArray.length - 1] : '';
   var probability = 0;
+
   if (content.includes('angular.module')) {
     probability++;
+  }
+
+  if (pathArray.length <= 3) {
+    probability++;
+  }
+
+  //check if the name of the file is 'app.js'
+  if (pathFile === 'app.js') {
+    probability++;
+  }
+
+  //check if file name doesn't contain hyphens, underscores, numbers or capital letters
+  if (pathFile.replace('.', '').match(/[^a-z]/)) {
+    probability--;
   }
 
   if (content.includes('.config')) {
