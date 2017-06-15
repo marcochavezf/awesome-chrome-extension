@@ -81,16 +81,18 @@ gulp.task('chromeManifest', () => {
 
 gulp.task('babel', () => {
   return gulp.src('app/scripts.babel/**/*.js')
+      .pipe($.sourcemaps.init())
       .pipe($.babel({
         presets: ['es2015']
       }))
+      .pipe($.sourcemaps.write('.'))
       .pipe(gulp.dest('app/scripts'));
 });
 
 gulp.task('clean', del.bind(null, ['.tmp', 'dist']));
 
 gulp.task('watch', ['lint', 'babel'], () => {
-  $.livereload.listen();
+  $.livereload.listen(35730);
 
   gulp.watch([
     'app/*.html',

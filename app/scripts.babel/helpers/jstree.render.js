@@ -41,7 +41,7 @@ function getFunctionDataAndType(angularComp, callFrame, typesAngularComp){
 	return functionData;
 }
 
-function getAngularDataFromCallFrame(fileSemantic, callFrame){
+function getAngularDataFromCallFrame({ fileSemantic, callFrame, semanticsUsed }){
 	var angularData = null;
 	_.each(fileSemantic, (angularCompArray, typesAngularComp) => {
 		if (!_.isEmpty(angularData)){
@@ -102,23 +102,65 @@ function getType(functionAngularData) {
 	}
 }
 
-function generateJstreeNodes(projectNodes, projectSemantics, path) {
+function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, path }) {
 	return _.map(projectNodes, function(projectNode){
 
 		var callFrame = projectNode.callFrame;
 		var url = callFrame.url.replace(path, '');
 		var fileParsed = _.find(projectSemantics.filesParsed, {pathFile: url});
-		var functionAngularData = getAngularDataFromCallFrame(fileParsed.fileSemantic, callFrame);
+		var functionAngularData = getAngularDataFromCallFrame({ fileSemantic: fileParsed.fileSemantic, callFrame });
+
+		appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url });
 
 		var text = getTextNode(functionAngularData, callFrame, url);
 		var type = getType(functionAngularData);
 		return {
 			'text' : text,
 			'type' : type,
-			'children' : generateJstreeNodes(projectNode.childrenNodes, projectSemantics, path),
-			'data': _.omit(projectNode, ['childrenNodes'])
+			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, path }),
+			//'data': _.omit(projectNode, ['childrenNodes'])
 		};
 	});
+}
+
+function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url }) {
+	var types = getType(functionAngularData);
+	var nameNgComponent = _.has(functionAngularData, 'angularComponent') ? functionAngularData.angularComponent.name : '';
+	var nameFunction = callFrame.functionName || 'Anonymous';
+	semanticsUsed[types] = semanticsUsed[types] || {};
+	semanticsUsed[types][nameNgComponent] = semanticsUsed[types][nameNgComponent] || {};
+	if (semanticsUsed[types][nameNgComponent][nameFunction]) {
+		semanticsUsed[types][nameNgComponent][nameFunction].timesCalled++;
+	} else {
+		semanticsUsed[types][nameNgComponent][nameFunction] = {
+			relativePath: url,
+			functionAngularData: functionAngularData,
+			callFrame: callFrame,
+			timesCalled: 1
+		};
+	}
+}
+
+function generateJstreeSemantics(semanticsUsed) {
+	var jsTreeSemantics = [];
+	_.each(semanticsUsed, (semantics, types) => {
+		_.each(semantics, (angularComp, angularCompName) => {
+			jsTreeSemantics.push({
+				'text' : angularCompName,
+				'type' : types,
+				'children' : _.map(angularComp, (functionComp, functionName) => {
+					var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
+					return  {
+						'text': text,
+						'type': types,
+						//'data': functionComp
+					}
+				})
+			});
+		});
+	});
+
+	return jsTreeSemantics;
 }
 
 function createJsTreeData(tabContent){
@@ -130,9 +172,14 @@ function createJsTreeData(tabContent){
 		return null;
 	}
 
+	var semanticsUsed = {};
 	var tabContent = tabContent.tabContent;
 	var path = tabContent.location.origin;
+	var profileJstreeData = generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, path });
+	var semanticsUsedJstreeData = generateJstreeSemantics(semanticsUsed);
 
-	var jsTreeData = generateJstreeNodes(projectNodes, projectSemantics, path);
-	return jsTreeData;
+	return {
+		profile: profileJstreeData,
+		semanticsUsed: semanticsUsedJstreeData
+	};
 }

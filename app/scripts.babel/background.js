@@ -115,6 +115,7 @@ function processTabContent(tabContent, tabId){
 
   tabsContent[tabId].tabContent = tabContent;
   var projectStructure = getProjectStructure(tabContent);
+
   angularEsprimaFun.createSemanticsFromSrc({
     pathAndSrcFiles: projectStructure.srcContent
   }, function (projectSemantics) {
@@ -127,6 +128,7 @@ function processTabContent(tabContent, tabId){
       cpuProfileJson: tabsContent[tabId].profile.profile,
       pathToFilter: pathToFilter
     }, function(projectNodes){
+
       tabsContent[tabId].projectNodes = projectNodes;
       renderDataInManagerTab(tabId);
     });
@@ -134,7 +136,8 @@ function processTabContent(tabContent, tabId){
 }
 
 function renderDataInManagerTab(tabId) {
-  var jsTreeData = createJsTreeData(tabsContent[tabId]);
+  var tabContent = tabsContent[tabId];
+  var jsTreeData = createJsTreeData(tabContent);
 
   chrome.runtime.sendMessage({action: 'jstree_data', jsTreeData: jsTreeData }, function(response){
     var tabIdToUpdate = tabsContent[tabId].managerTab.id;

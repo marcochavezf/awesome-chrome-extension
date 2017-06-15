@@ -12,13 +12,21 @@
 </head>
 <body>
   <h2>Awesome AngularJs Profiler</h2>
+  <button id="open_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Open All</button>
+  <button id="close_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Close All</button>
+
   <div id="loading" style="display:block;">
     <p id="status">Loading...</p>
     <img src="images/ripple.gif" style="width:50px;">
   </div>
-  <p id="content" style="display:none;"></p>
+  <p id="content" style="display:none;">
+    <div id="profile-nodes"></div>
+    <br/>
+    <br/>
+    <div id="semantic-nodes"></div>
+  </p>
 
-  <div id="code-nodes"></div>
+
   <!-- build:js scripts/popup-vendor.js -->
   <!-- bower:js -->
   <script src="bower_components/lodash/lodash.js"></script>
