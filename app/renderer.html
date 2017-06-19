@@ -4,6 +4,7 @@
   <!-- build:css styles/manager-vendor.css -->
   <!-- bower:css -->
   <link rel="stylesheet" href="bower_components/jstree/dist/themes/default/style.css" />
+  <link rel="stylesheet" href="bower_components/normalize-css/normalize.css" />
   <!-- endbower -->
   <!-- endbuild -->
   <!-- build:css styles/main.css -->
@@ -11,20 +12,35 @@
   <!-- endbuild -->
 </head>
 <body>
-  <h2>Awesome AngularJs Profiler</h2>
-  <button id="open_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Open All</button>
-  <button id="close_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Close All</button>
 
-  <div id="loading" style="display:block;">
-    <p id="status">Loading...</p>
-    <img src="images/ripple.gif" style="width:50px;">
+<h2>Awesome AngularJs Profiler</h2>
+
+
+  <div id="a" class="split split-horizontal">
+    <div id="c" class="split content">
+
+      <p id="content" style="display:none;">
+        <button id="open_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Open All</button>
+        <button id="close_tree" style="display:none;" class="ui-button ui-widget ui-corner-all">Close All</button>
+
+        <div id="loading" style="display:block;">
+          <p id="status">Loading...</p>
+          <img src="images/ripple.gif" style="width:50px;">
+        </div>
+        <div id="profile-nodes"></div>
+      </p>
+
+    </div>
   </div>
-  <p id="content" style="display:none;">
-    <div id="profile-nodes"></div>
-    <br/>
-    <br/>
-    <div id="semantic-nodes"></div>
-  </p>
+
+  <div id="b" class="split split-horizontal">
+    <div id="d" class="split content">
+      <div id="semantic-nodes"></div>
+    </div>
+    <div id="e" class="split content">
+
+    </div>
+  </div>
 
 
   <!-- build:js scripts/popup-vendor.js -->
@@ -32,10 +48,11 @@
   <script src="bower_components/lodash/lodash.js"></script>
   <script src="bower_components/jquery/dist/jquery.js"></script>
   <script src="bower_components/jstree/dist/jstree.js"></script>
+  <script src="bower_components/Split.js/split.js"></script>
   <!-- endbower -->
   <!-- endbuild -->
 
-  <!-- build:js scripts/manager.js -->
+  <!-- build:js scripts/renderer.js -->
   <script src="scripts/renderer.js"></script>
   <!-- endbuild -->
 </body>

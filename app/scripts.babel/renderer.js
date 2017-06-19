@@ -78,6 +78,7 @@ function createJstreeConfig(data){
 
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOMContentLoaded');
+
 });
 
 $(function() {
@@ -87,5 +88,26 @@ $(function() {
 
   $('#close_tree').click(function(event) {
     $('#profile-nodes').jstree('close_all');
+  });
+
+  Split(['#a', '#b'], {
+    direction: 'horizontal',
+    sizes: [50, 50],
+    gutterSize: 8,
+    cursor: 'col-resize'
+  });
+
+  Split(['#c'], {
+    direction: 'vertical',
+    sizes: [100],
+    gutterSize: 8,
+    cursor: 'row-resize'
+  });
+
+  Split(['#d', '#e'], {
+    direction: 'vertical',
+    sizes: [60, 40],
+    gutterSize: 8,
+    cursor: 'row-resize'
   });
 });

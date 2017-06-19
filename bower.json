@@ -9,6 +9,8 @@
   "dependencies": {
     "lodash": "^4.17.4",
     "jquery": "^3.2.1",
-    "jstree": "^3.3.4"
+    "jstree": "^3.3.4",
+    "Split.js": "^1.3.5",
+    "normalize-css": "normalize.css#^7.0.0"
   }
 }
