@@ -102,13 +102,14 @@ function getType(functionAngularData) {
 	}
 }
 
-function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, path }) {
+function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, scriptsContent, path }) {
 	return _.map(projectNodes, function(projectNode){
 
 		var callFrame = projectNode.callFrame;
 		var url = callFrame.url.replace(path, '');
 		var fileParsed = _.find(projectSemantics.filesParsed, {pathFile: url});
 		var functionAngularData = getAngularDataFromCallFrame({ fileSemantic: fileParsed.fileSemantic, callFrame });
+		var scriptContent = _.find(scriptsContent, { path: url });
 
 		appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url });
 
@@ -117,8 +118,8 @@ function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsU
 		return {
 			'text' : text,
 			'type' : type,
-			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, path }),
-			//'data': _.omit(projectNode, ['childrenNodes'])
+			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, scriptsContent, path }),
+			'data' : { callFrame, scriptContent }
 		};
 	});
 }
@@ -165,7 +166,6 @@ function generateJstreeSemantics(semanticsUsed) {
 
 function createJsTreeData(tabContent){
 	//TODO: merge generated debugger data with project semantics
-	console.log(tabContent);
 	var projectNodes = tabContent.projectNodes;
 	var projectSemantics = tabContent.projectSemantics;
 	if (_.isEmpty(projectNodes)) {
@@ -175,7 +175,7 @@ function createJsTreeData(tabContent){
 	var semanticsUsed = {};
 	var tabContent = tabContent.tabContent;
 	var path = tabContent.location.origin;
-	var profileJstreeData = generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, path });
+	var profileJstreeData = generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, scriptsContent: tabContent.scriptsContent, path });
 	var semanticsUsedJstreeData = generateJstreeSemantics(semanticsUsed);
 
 	return {

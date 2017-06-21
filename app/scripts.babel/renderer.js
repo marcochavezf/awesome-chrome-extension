@@ -1,3 +1,5 @@
+var editor = null;
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   var loading = document.getElementById('loading');
   var content = document.getElementById('content');
@@ -41,7 +43,21 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#profile-nodes')
   .on('select_node.jstree', function (e, data) {
-    console.log(e,data);
+    if (!editor) {
+      return;
+    }
+
+    var nodeData = data.node.data;
+    var scriptContent = nodeData.scriptContent;
+    var editorSessionId = scriptContent.path;
+
+    if (editor.sessionId !== editorSessionId) {
+      editor.sessionId = editorSessionId;
+      editor.setValue(scriptContent.content);
+    }
+
+    editor.gotoLine(nodeData.callFrame.lineNumber, nodeData.callFrame.columnNumber);
+    //editor.getSession().setUndoManager(new ace.UndoManager());
   })
   .on('ready.jstree', function() {
     $('#profile-nodes').jstree('open_all');
@@ -111,7 +127,7 @@ $(function() {
     cursor: 'row-resize'
   });
 
-  var editor = ace.edit('editor');
+  editor = ace.edit('editor');
   editor.setTheme('ace/theme/chrome');
   editor.getSession().setMode('ace/mode/javascript');
 });
