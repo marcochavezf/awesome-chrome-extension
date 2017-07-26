@@ -159,7 +159,7 @@ function initializeDebugger(tabId){
     if (statusAttachedTabs[tabId] === 'checking_contentscript') {
       confirmRestartTab(tabId);
     }
-  }, oneSecond)
+  }, oneSecond);
 
   chrome.tabs.sendMessage(tabId, {action: 'ack'}, function(response){
     if (response) {

@@ -1165,17 +1165,7 @@ function getProjectNodesFromProfile(params, callback) {
     cpuProfileJson = JSON.parse(cpuProfileText);
   }
 
-  var chainedAllFunctions = [];
-  _.each(cpuProfileJson.nodes, function (functionNode) {
-    functionNode.childrenNodes = [];
-    var doesFnNodeBelongTo = addFunctionToChainedFunctions(chainedAllFunctions, functionNode);
-
-    //If the 'functionNode' wasn't able to be added, then add it to 'chainedFunctions' (root)
-    if (!doesFnNodeBelongTo) {
-      chainedAllFunctions.push(functionNode);
-    }
-  });
-
+  var chainedAllFunctions = getAllChainedFunctions(cpuProfileJson);
   if (pathOutput) {
     fs.writeFile(pathOutput + '/chained_functions.json', JSON.stringify(chainedAllFunctions, null, 2), function (error) {
       if (error) {
@@ -1196,6 +1186,47 @@ function getProjectNodesFromProfile(params, callback) {
   }
 
   callback(projectNodes);
+}
+
+function getAllChainedFunctions(cpuProfileJson) {
+  if (_.isEmpty(cpuProfileJson.nodes)) {
+    return [];
+  }
+
+  var rootNode = null;
+  var parentsLookingForChildren = {};
+  var childrenNodes = {};
+  _.each(cpuProfileJson.nodes, function (functionNode) {
+    //check parent nodes
+    var parentNode = parentsLookingForChildren[functionNode.id];
+    if (parentNode) {
+      parentNode.childrenNodes.push(functionNode);
+    } else {
+      childrenNodes[functionNode.id] = functionNode;
+    }
+
+    //check children nodes
+    _.each(functionNode.children, function (childNodeId) {
+      var childNode = childrenNodes[childNodeId];
+      if (childNode) {
+        functionNode.childrenNodes.push(childNode);
+      } else {
+        functionNode.childrenNodes = [];
+        parentsLookingForChildren[childNodeId] = functionNode;
+      }
+    });
+
+    //get the root node in each iteration
+    if (rootNode) {
+      if (functionNode.id < rootNode.id) {
+        rootNode = functionNode;
+      }
+    } else {
+      rootNode = functionNode;
+    }
+  });
+
+  return [rootNode];
 }
 
 function filterProjectNodes(nodeFunctions, pathToFilter) {
@@ -1219,27 +1250,6 @@ function filterProjectNodes(nodeFunctions, pathToFilter) {
   });
 
   return newNodeFnArray;
-}
-
-function addFunctionToChainedFunctions(chainedFunctions, functionNode) {
-  //1. Check 'children' of each chained function,
-  //   if one of those  match with function node then add it to 'childrenNodes' array
-  var doesFnNodeBelongTo = _.find(chainedFunctions, function (chainedFn) {
-
-    var doesFnNodeBelongTo = _.find(chainedFn.children, function (idChild) {
-      return idChild === functionNode.id;
-    });
-
-    if (doesFnNodeBelongTo) {
-      chainedFn.childrenNodes.push(functionNode);
-      return doesFnNodeBelongTo;
-    }
-
-    //2. If 'functionNode' doesn't belong to 'chainedFn.children' then repeat step 1 with each 'childrenNodes'
-    return addFunctionToChainedFunctions(chainedFn.childrenNodes, functionNode);
-  });
-
-  return doesFnNodeBelongTo;
 }
 
 function createProjectSemantics(dir, callback, enableVerbose) {
