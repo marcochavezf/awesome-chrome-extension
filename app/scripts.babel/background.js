@@ -115,7 +115,6 @@ function processTabContent(tabContent, tabId){
 
   tabsContent[tabId].tabContent = tabContent;
   var projectStructure = getProjectStructure(tabContent);
-
   angularEsprimaFun.createSemanticsFromSrc({
     pathAndSrcFiles: projectStructure.srcContent
   }, function (projectSemantics) {
@@ -123,12 +122,10 @@ function processTabContent(tabContent, tabId){
 
     tabsContent[tabId].projectSemantics = projectSemantics;
     var pathToFilter = tabsContent[tabId].tabContent.location.origin + '/' + projectStructure.srcFolder;
-
     angularEsprimaFun.getProjectNodesFromProfile({
       cpuProfileJson: tabsContent[tabId].profile.profile,
       pathToFilter: pathToFilter
     }, function(projectNodes){
-
       tabsContent[tabId].projectNodes = projectNodes;
       renderDataInManagerTab(tabId);
     });

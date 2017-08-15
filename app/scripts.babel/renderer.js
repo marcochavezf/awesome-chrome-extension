@@ -70,9 +70,18 @@ function displayContent(content, jsTreeData){
   .on('select_node.jstree', function (e, data) {
     console.log(e,data);
   })
-  .on('ready.jstree', function() {
-    $('#semantic-nodes').jstree('open_all');
-  }).jstree(semanticJstreeConfig);
+  .bind('loaded.jstree', function (e, data) {
+    /**
+     * Open nodes on load (until 2nd level)
+     */
+    var depth = 2;
+    data.instance.get_container().find('li').each(function (i) {
+      if (data.instance.get_path($(this)).length <= depth) {
+        data.instance.open_node($(this));
+      }
+    });
+  })
+  .jstree(semanticJstreeConfig);
 }
 
 function createJstreeConfig(data){

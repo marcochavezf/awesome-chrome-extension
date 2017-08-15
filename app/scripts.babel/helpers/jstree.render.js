@@ -145,19 +145,25 @@ function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url
 function generateJstreeSemantics(semanticsUsed) {
 	var jsTreeSemantics = [];
 	_.each(semanticsUsed, (semantics, types) => {
-		_.each(semantics, (angularComp, angularCompName) => {
-			jsTreeSemantics.push({
-				'text' : angularCompName,
-				'type' : types,
-				'children' : _.map(angularComp, (functionComp, functionName) => {
-					var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
-					return  {
-						'text': text,
-						'type': types,
-						//'data': functionComp
-					}
-				})
-			});
+		jsTreeSemantics.push({
+			'text' : _.upperFirst(types),
+			'type' : types,
+			'children' : _.map(semantics, (angularComp, angularCompName) => {
+				var firstPropertyAngComp = angularComp[Object.keys(angularComp)[0]];
+				var textAngularComp = angularCompName + ' - ' + firstPropertyAngComp.relativePath;
+				return  {
+					'text': textAngularComp,
+					'type': types,
+					'children' : _.map(angularComp, (functionComp, functionName) => {
+						var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
+						return  {
+							'text': text,
+							'type': types,
+							//'data': functionComp
+						};
+					})
+				};
+			})
 		});
 	});
 
