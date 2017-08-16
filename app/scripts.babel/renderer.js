@@ -32,32 +32,45 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+function openScriptContent({ scriptsContent, nodeData }){
+  if (!editor) {
+    return;
+  }
+
+  if (!nodeData) {
+    editor.sessionId = null;
+    editor.setValue(null);
+    return;
+  }
+
+  var scriptContent = _.find(scriptsContent, { path: nodeData.path });
+  var editorSessionId = nodeData.path;
+
+  if (editor.sessionId !== editorSessionId) {
+    editor.sessionId = editorSessionId;
+    editor.setValue(scriptContent.content);
+  }
+
+  var lineNumber = nodeData.callFrame ? nodeData.callFrame.lineNumber : 1;
+  var columnNumber = nodeData.callFrame ? nodeData.callFrame.columnNumber : 0;
+  editor.resize(true);
+  editor.gotoLine(lineNumber, columnNumber);
+  //editor.getSession().setUndoManager(new ace.UndoManager());
+}
+
 function displayContent(content, jsTreeData){
   if (_.isEmpty(jsTreeData)) {
     content.innerHTML = 'No data registered';
     return;
   }
-
+  
+  var scriptsContent = jsTreeData.scriptsContent;
   var profileJstreeData = jsTreeData.profile;
   var profileJstreeConfig = createJstreeConfig(profileJstreeData);
   content.innerHTML = '';
   $('#profile-nodes')
   .on('select_node.jstree', function (e, data) {
-    if (!editor) {
-      return;
-    }
-
-    var nodeData = data.node.data;
-    var scriptContent = nodeData.scriptContent;
-    var editorSessionId = scriptContent.path;
-
-    if (editor.sessionId !== editorSessionId) {
-      editor.sessionId = editorSessionId;
-      editor.setValue(scriptContent.content);
-    }
-
-    editor.gotoLine(nodeData.callFrame.lineNumber, nodeData.callFrame.columnNumber);
-    //editor.getSession().setUndoManager(new ace.UndoManager());
+    openScriptContent({ scriptsContent, nodeData: data.node.data });
   })
   .on('ready.jstree', function() {
     $('#profile-nodes').jstree('open_all');
@@ -68,7 +81,7 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#semantic-nodes')
   .on('select_node.jstree', function (e, data) {
-    console.log(e,data);
+    openScriptContent({ scriptsContent, nodeData: data.node.data });
   })
   .bind('loaded.jstree', function (e, data) {
     /**

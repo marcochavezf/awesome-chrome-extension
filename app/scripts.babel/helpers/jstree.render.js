@@ -102,29 +102,28 @@ function getType(functionAngularData) {
 	}
 }
 
-function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, scriptsContent, path }) {
+function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, basePath }) {
 	return _.map(projectNodes, function(projectNode){
 
 		var callFrame = projectNode.callFrame;
-		var url = callFrame.url.replace(path, '');
-		var fileParsed = _.find(projectSemantics.filesParsed, {pathFile: url});
+		var path = callFrame.url.replace(basePath, '');
+		var fileParsed = _.find(projectSemantics.filesParsed, {pathFile: path});
 		var functionAngularData = getAngularDataFromCallFrame({ fileSemantic: fileParsed.fileSemantic, callFrame });
-		var scriptContent = _.find(scriptsContent, { path: url });
 
-		appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url });
+		appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, path });
 
-		var text = getTextNode(functionAngularData, callFrame, url);
+		var text = getTextNode(functionAngularData, callFrame, path);
 		var type = getType(functionAngularData);
 		return {
 			'text' : text,
 			'type' : type,
-			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, scriptsContent, path }),
-			'data' : { callFrame, scriptContent }
+			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, basePath }),
+			'data' : { callFrame, path }
 		};
 	});
 }
 
-function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url }) {
+function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, path }) {
 	var types = getType(functionAngularData);
 	var nameNgComponent = _.has(functionAngularData, 'angularComponent') ? functionAngularData.angularComponent.name : '';
 	var nameFunction = callFrame.functionName || 'Anonymous';
@@ -134,7 +133,7 @@ function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, url
 		semanticsUsed[types][nameNgComponent][nameFunction].timesCalled++;
 	} else {
 		semanticsUsed[types][nameNgComponent][nameFunction] = {
-			relativePath: url,
+			relativePath: path,
 			functionAngularData: functionAngularData,
 			callFrame: callFrame,
 			timesCalled: 1
@@ -154,12 +153,13 @@ function generateJstreeSemantics(semanticsUsed) {
 				return  {
 					'text': textAngularComp,
 					'type': types,
+					'data': { path: firstPropertyAngComp.relativePath },
 					'children' : _.map(angularComp, (functionComp, functionName) => {
 						var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
 						return  {
 							'text': text,
 							'type': types,
-							//'data': functionComp
+							'data': { callFrame: functionComp.callFrame, path: functionComp.relativePath }
 						};
 					})
 				};
@@ -180,12 +180,14 @@ function createJsTreeData(tabContent){
 
 	var semanticsUsed = {};
 	var tabContent = tabContent.tabContent;
-	var path = tabContent.location.origin;
-	var profileJstreeData = generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, scriptsContent: tabContent.scriptsContent, path });
+	var basePath = tabContent.location.origin;
+	var scriptsContent = tabContent.scriptsContent;
+	var profileJstreeData = generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsUsed, basePath });
 	var semanticsUsedJstreeData = generateJstreeSemantics(semanticsUsed);
 
 	return {
 		profile: profileJstreeData,
-		semanticsUsed: semanticsUsedJstreeData
+		semanticsUsed: semanticsUsedJstreeData,
+		scriptsContent
 	};
 }
