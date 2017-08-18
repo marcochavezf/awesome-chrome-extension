@@ -7,6 +7,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   var openTreeBtn = document.getElementById('open_tree');
   var closeTreeBtn = document.getElementById('close_tree');
 
+  cleanEditor();
   status.innerHTML = 'Loading, please wait...';
   $('#profile-nodes').jstree('destroy').empty();
   $('#semantic-nodes').jstree('destroy').empty();
@@ -14,20 +15,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   
   switch (msg.action) {
     case 'update_status':
+      status.innerHTML = msg.status;
       loading.style.display = 'block';
       content.style.display = 'none';
       openTreeBtn.style.display = 'none';
       closeTreeBtn.style.display = 'none';
-      status.innerHTML = msg.status;
       break;
 
     case 'jstree_data':
-      displayContent(content, msg.jsTreeData)
+      displayContent(content, msg.jsTreeData);
       loading.style.display = 'none';
       content.style.display = 'block';
       openTreeBtn.style.display = 'block';
       closeTreeBtn.style.display = 'block';
-      console.log('data', msg, sender);
       break;
   }
 });
@@ -38,8 +38,7 @@ function openScriptContent({ scriptsContent, nodeData }){
   }
 
   if (!nodeData) {
-    editor.sessionId = null;
-    editor.setValue(null);
+    cleanEditor();
     return;
   }
 
@@ -56,6 +55,25 @@ function openScriptContent({ scriptsContent, nodeData }){
   editor.resize(true);
   editor.gotoLine(lineNumber, columnNumber);
   //editor.getSession().setUndoManager(new ace.UndoManager());
+}
+
+function cleanEditor(){
+  if (editor) {
+    editor.sessionId = '';
+    editor.setValue('');
+  }
+}
+
+function setHighlightNode(nodeDOM, highlight) {
+  if (!nodeDOM[0].childNodes[1].originalStyle) {
+    nodeDOM[0].childNodes[1].originalStyle = _.cloneDeep(nodeDOM[0].childNodes[1].style);
+  }
+
+  if (highlight) {
+    nodeDOM[0].childNodes[1].style.backgroundColor = 'yellow';
+  } else {
+    nodeDOM[0].childNodes[1].style = nodeDOM[0].childNodes[1].originalStyle;
+  }
 }
 
 function displayContent(content, jsTreeData){
@@ -81,7 +99,35 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#semantic-nodes')
   .on('select_node.jstree', function (e, data) {
-    openScriptContent({ scriptsContent, nodeData: data.node.data });
+    var semanticNodeData = data.node.data;
+    openScriptContent({ scriptsContent, nodeData: semanticNodeData });
+    var nodes = null;
+    try {
+      nodes = $('#profile-nodes').jstree().get_json($('#profile-nodes'), { flat: true });
+    } catch (e) {
+      return;
+    }
+    //get the nodes that match with this node (set an identifier like the angular component name and the name of the function)
+    _.each(nodes, function(value) {
+      var profileNodeDOM = $('#profile-nodes').jstree().get_node(value.id, true);
+      var profileNodeData = value.data;
+      setHighlightNode(profileNodeDOM, false);
+
+      if (!semanticNodeData) {
+        cleanEditor();
+        return;
+      }
+
+      if (semanticNodeData.angularCompName == profileNodeData.angularCompName) {
+        if (semanticNodeData.callFrame) {
+          if (_.isEqual(semanticNodeData.callFrame, profileNodeData.callFrame)) {
+            setHighlightNode(profileNodeDOM, true);
+          }
+        } else {
+          setHighlightNode(profileNodeDOM, true);
+        }
+      }
+    });
   })
   .bind('loaded.jstree', function (e, data) {
     /**

@@ -118,7 +118,7 @@ function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsU
 			'text' : text,
 			'type' : type,
 			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, basePath }),
-			'data' : { callFrame, path }
+			'data' : { callFrame, path, angularCompName: functionAngularData.angularComponent.name }
 		};
 	});
 }
@@ -153,13 +153,13 @@ function generateJstreeSemantics(semanticsUsed) {
 				return  {
 					'text': textAngularComp,
 					'type': types,
-					'data': { path: firstPropertyAngComp.relativePath },
+					'data': { path: firstPropertyAngComp.relativePath, angularCompName },
 					'children' : _.map(angularComp, (functionComp, functionName) => {
 						var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
 						return  {
 							'text': text,
 							'type': types,
-							'data': { callFrame: functionComp.callFrame, path: functionComp.relativePath }
+							'data': { callFrame: functionComp.callFrame, path: functionComp.relativePath, angularCompName }
 						};
 					})
 				};
