@@ -41,7 +41,7 @@ function getFunctionDataAndType(angularComp, callFrame, typesAngularComp){
 	return functionData;
 }
 
-function getAngularDataFromCallFrame({ fileSemantic, callFrame, semanticsUsed }){
+function getAngularDataFromCallFrame({ fileSemantic, callFrame }){
 	var angularData = null;
 	_.each(fileSemantic, (angularCompArray, typesAngularComp) => {
 		if (!_.isEmpty(angularData)){
@@ -70,6 +70,14 @@ function getAngularDataFromCallFrame({ fileSemantic, callFrame, semanticsUsed })
 			}
 		});
 	});
+
+	if (_.isNil(angularData)) {
+		angularData = {
+			types: 'others',
+			angularComponent: { name: '' },
+			functionData: null
+		};
+	}
 
 	return angularData;
 }
@@ -114,19 +122,21 @@ function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsU
 
 		var text = getTextNode(functionAngularData, callFrame, path);
 		var type = getType(functionAngularData);
+		var angularCompName = _.has(functionAngularData.angularComponent, 'name') ? functionAngularData.angularComponent.name : path;
 		return {
 			'text' : text,
 			'type' : type,
 			'children' : generateJstreeProfileNodes({ projectNodes: projectNode.childrenNodes, projectSemantics, semanticsUsed, basePath }),
-			'data' : { callFrame, path, angularCompName: functionAngularData.angularComponent.name }
+			'data' : { callFrame, path, angularCompName }
 		};
 	});
 }
 
 function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, path }) {
 	var types = getType(functionAngularData);
-	var nameNgComponent = _.has(functionAngularData, 'angularComponent') ? functionAngularData.angularComponent.name : '';
-	var nameFunction = callFrame.functionName || 'Anonymous';
+	var nameNgComponent = functionAngularData.angularComponent.name;
+	var nameFunction = callFrame.functionName || ('Anonymous:' + callFrame.lineNumber);
+	nameNgComponent = nameNgComponent ? nameNgComponent : path;
 	semanticsUsed[types] = semanticsUsed[types] || {};
 	semanticsUsed[types][nameNgComponent] = semanticsUsed[types][nameNgComponent] || {};
 	if (semanticsUsed[types][nameNgComponent][nameFunction]) {
@@ -149,7 +159,10 @@ function generateJstreeSemantics(semanticsUsed) {
 			'type' : types,
 			'children' : _.map(semantics, (angularComp, angularCompName) => {
 				var firstPropertyAngComp = angularComp[Object.keys(angularComp)[0]];
-				var textAngularComp = angularCompName + ' - ' + firstPropertyAngComp.relativePath;
+				var textAngularComp = angularCompName;
+				if (textAngularComp !== firstPropertyAngComp.relativePath) {
+					textAngularComp += ' - ' + firstPropertyAngComp.relativePath;
+				}
 				return  {
 					'text': textAngularComp,
 					'type': types,

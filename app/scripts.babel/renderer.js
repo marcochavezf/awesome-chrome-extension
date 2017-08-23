@@ -18,16 +18,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       status.innerHTML = msg.status;
       loading.style.display = 'block';
       content.style.display = 'none';
-      openTreeBtn.style.display = 'none';
-      closeTreeBtn.style.display = 'none';
+      if (openTreeBtn) {
+        openTreeBtn.style.display = 'none';
+      }
+      if (closeTreeBtn) {
+        closeTreeBtn.style.display = 'none';
+      }
       break;
 
     case 'jstree_data':
       displayContent(content, msg.jsTreeData);
       loading.style.display = 'none';
       content.style.display = 'block';
-      openTreeBtn.style.display = 'block';
-      closeTreeBtn.style.display = 'block';
+      if (openTreeBtn) {
+        openTreeBtn.style.display = 'block';
+      }
+      if (closeTreeBtn) {
+        closeTreeBtn.style.display = 'block';
+      }
       break;
   }
 });
@@ -91,12 +99,18 @@ function displayContent(content, jsTreeData){
     var profileNodeData = data.node.data;
     openScriptContent({ scriptsContent, nodeData: profileNodeData });
     var semanticNodes = null;
+    var profileNodes = null;
     try {
       semanticNodes = $('#semantic-nodes').jstree().get_json($('#semantic-nodes'), { flat: true });
+      profileNodes = $('#profile-nodes').jstree().get_json($('#profile-nodes'), { flat: true });
     } catch (e) {
       return;
     }
     $('#semantic-nodes').jstree().deselect_node(semanticNodes);
+    _.each(profileNodes, function(profileNode) {
+      var profileNodeDOM = $('#profile-nodes').jstree().get_node(profileNode.id, true);
+      setHighlightNode(profileNodeDOM, false);
+    });
   })
   .on('ready.jstree', function() {
     $('#profile-nodes').jstree('open_all');
@@ -127,7 +141,9 @@ function displayContent(content, jsTreeData){
         return;
       }
 
-      if (semanticNodeData.angularCompName == profileNodeData.angularCompName) {
+      var hasSameAngCompName = semanticNodeData.angularCompName == profileNodeData.angularCompName;
+      var hasSamePathButNoAngCompName = semanticNodeData.path == profileNodeData.path && _.isEmpty(profileNodeData.angularCompName);
+      if (hasSameAngCompName || hasSamePathButNoAngCompName) {
         if (semanticNodeData.callFrame) {
           if (_.isEqual(semanticNodeData.callFrame, profileNodeData.callFrame)) {
             setHighlightNode(profileNodeDOM, true);
