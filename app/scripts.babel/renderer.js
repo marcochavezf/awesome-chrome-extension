@@ -88,7 +88,15 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#profile-nodes')
   .on('select_node.jstree', function (e, data) {
-    openScriptContent({ scriptsContent, nodeData: data.node.data });
+    var profileNodeData = data.node.data;
+    openScriptContent({ scriptsContent, nodeData: profileNodeData });
+    var semanticNodes = null;
+    try {
+      semanticNodes = $('#semantic-nodes').jstree().get_json($('#semantic-nodes'), { flat: true });
+    } catch (e) {
+      return;
+    }
+    $('#semantic-nodes').jstree().deselect_node(semanticNodes);
   })
   .on('ready.jstree', function() {
     $('#profile-nodes').jstree('open_all');
@@ -107,6 +115,7 @@ function displayContent(content, jsTreeData){
     } catch (e) {
       return;
     }
+    $('#profile-nodes').jstree().deselect_node(nodes);
     //get the nodes that match with this node (set an identifier like the angular component name and the name of the function)
     _.each(nodes, function(value) {
       var profileNodeDOM = $('#profile-nodes').jstree().get_node(value.id, true);
