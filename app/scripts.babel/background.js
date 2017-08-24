@@ -200,12 +200,13 @@ function onAttach(debuggeeId) {
   chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project...'});
   statusAttachedTabs[tabId] = 'recording';
   updateManagerStatus('Recording...', tabId);
-  
+
   chrome.debugger.sendCommand(debuggeeId, 'Profiler.enable', {}, onDebuggerEnabled.bind(null, debuggeeId));
 }
 
 function onDebuggerEnabled(debuggeeId) {
-  chrome.debugger.sendCommand(debuggeeId, 'Profiler.setSamplingInterval', { interval: 50 });
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.startPreciseCoverage');
+  chrome.debugger.sendCommand(debuggeeId, 'Profiler.setSamplingInterval', { interval: 1 });
   chrome.debugger.sendCommand(debuggeeId, 'Profiler.start');
 }
 
