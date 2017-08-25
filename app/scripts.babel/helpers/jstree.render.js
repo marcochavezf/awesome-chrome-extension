@@ -93,9 +93,9 @@ function getTextNode(functionAngularData, callFrame, url) {
 		functionName = callFrame.functionName + '()';
 	}
 	if (_.isEmpty(callFrame.functionName)) {
-		functionName = angularComponentName + ' ' + 'Anonymous Fn';
+		functionName = angularComponentName + ' ' + 'anonymous function';
 		if (_.isEmpty(angularComponentName)) {
-			functionName = 'Anonymous Fn';
+			functionName = 'anonymous function';
 		}
 	}
 	var text = functionName + ' - ' + url + ':' + callFrame.lineNumber;
@@ -118,6 +118,7 @@ function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsU
 		var fileParsed = _.find(projectSemantics.filesParsed, {pathFile: path});
 		var functionAngularData = getAngularDataFromCallFrame({ fileSemantic: fileParsed.fileSemantic, callFrame });
 
+		callFrame.lineNumber = parseInt(callFrame.lineNumber) + 1;
 		appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, path });
 
 		var text = getTextNode(functionAngularData, callFrame, path);
@@ -135,7 +136,7 @@ function generateJstreeProfileNodes({ projectNodes, projectSemantics, semanticsU
 function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, path }) {
 	var types = getType(functionAngularData);
 	var nameNgComponent = functionAngularData.angularComponent.name;
-	var nameFunction = callFrame.functionName || ('Anonymous:' + callFrame.lineNumber);
+	var nameFunction = callFrame.functionName || ('anonymous:' + callFrame.lineNumber);
 	nameNgComponent = nameNgComponent ? nameNgComponent : path;
 	semanticsUsed[types] = semanticsUsed[types] || {};
 	semanticsUsed[types][nameNgComponent] = semanticsUsed[types][nameNgComponent] || {};
@@ -151,23 +152,52 @@ function appendSemanticUsed({ semanticsUsed, functionAngularData, callFrame, pat
 	}
 }
 
+function getSortedProperties(objectComponent){
+	var keyProperties = [];
+	for (var key in objectComponent) {
+		if (objectComponent.hasOwnProperty(key)) {
+			keyProperties.push(key);
+		}
+	}
+	keyProperties.sort(function(a, b) {
+		var nameA = a.toUpperCase(); // ignore upper and lowercase
+		var nameB = b.toUpperCase(); // ignore upper and lowercase
+		if (nameA < nameB) {
+			return -1;
+		}
+		if (nameA > nameB) {
+			return 1;
+		}
+
+		// names must be equal
+		return 0;
+	});
+	return keyProperties;
+}
+
 function generateJstreeSemantics(semanticsUsed) {
 	var jsTreeSemantics = [];
 	_.each(semanticsUsed, (semantics, types) => {
+
+		var keysSematincs = getSortedProperties(semantics);
 		jsTreeSemantics.push({
 			'text' : _.upperFirst(types),
 			'type' : types,
-			'children' : _.map(semantics, (angularComp, angularCompName) => {
+			'children' : _.map(keysSematincs, (angularCompName) => {
+				var angularComp = semantics[angularCompName];
 				var firstPropertyAngComp = angularComp[Object.keys(angularComp)[0]];
 				var textAngularComp = angularCompName;
 				if (textAngularComp !== firstPropertyAngComp.relativePath) {
 					textAngularComp += ' - ' + firstPropertyAngComp.relativePath;
 				}
+
+				var keysAngularComp = getSortedProperties(angularComp);
 				return  {
 					'text': textAngularComp,
 					'type': types,
 					'data': { path: firstPropertyAngComp.relativePath, angularCompName },
-					'children' : _.map(angularComp, (functionComp, functionName) => {
+					'children' : _.map(keysAngularComp, (functionName) => {
+						var functionComp = angularComp[functionName];
 						var text = functionName + ' (' + functionComp.timesCalled + ') - ' + functionComp.relativePath + ':' + functionComp.callFrame.lineNumber;
 						return  {
 							'text': text,
