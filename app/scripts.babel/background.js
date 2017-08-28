@@ -15,6 +15,30 @@ chrome.tabs.onCreated.addListener(function(tab){
     }, 500);
   }
 });
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
+  if (changeInfo.status === 'loading') {
+    var status = statusAttachedTabs[tabId];
+    switch (status) {
+      case 'recording':
+        chrome.browserAction.setIcon({tabId: tabId, path:'images/stop.png'});
+        chrome.browserAction.setTitle({tabId: tabId, title:'Recording AngularJs project...'});
+        break;
+      case 'stoping':
+      case 'generating_project':
+        chrome.browserAction.setIcon({tabId:tabId, path:'images/stoping.png'});
+        chrome.browserAction.setTitle({tabId:tabId, title:'Getting tab content...'});
+        break;
+    }
+  }
+});
+chrome.tabs.onRemoved.addListener(function(tabId, removeInfo){
+  var tabId = tab.id;
+  debugger;
+});
+chrome.tabs.onReplaced.addListener(function(addedTabId, removedTabId){
+  var tabId = tab.id;
+  debugger;
+});
 chrome.windows.getAll({'populate':true}, function(windows) {
   var existing_tab = null;
   for (var i in windows) {
