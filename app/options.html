@@ -20,11 +20,17 @@
     <script src="bower_components/jquery/dist/jquery.js"></script>
     <script src="bower_components/jstree/dist/jstree.js"></script>
     <script src="bower_components/Split.js/split.js"></script>
+    <script src="bower_components/raygun4js/dist/raygun.js"></script>
     <!-- endbower -->
     <!-- endbuild -->
 
     <!-- build:js scripts/options.js -->
     <script src="scripts/options.js"></script>
     <!-- endbuild -->
+    <script type="text/javascript">
+      rg4js('apiKey', 'aIBRUB8N/sIC2QFzkhWegA==');
+      rg4js('enableCrashReporting', true);
+      rg4js('enablePulse', true);
+    </script>
   </body>
 </html>

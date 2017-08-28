@@ -6,6 +6,24 @@ var version = '1.0';
 
 chrome.debugger.onEvent.addListener(onEvent);
 chrome.debugger.onDetach.addListener(onDetach);
+chrome.identity.getProfileUserInfo(function(userInfo) {
+  /* Use userInfo.email, or better (for privacy) userInfo.id
+   They will be empty if user is not signed in in Chrome */
+  Raygun.init('aIBRUB8N/sIC2QFzkhWegA==', {
+    enableCrashReporting: true,
+    enablePulse: true,
+    apiUrl: 'https://api.raygun.com'
+  }).attach();
+  Raygun.setUser(userInfo.id, false, userInfo.email);
+});
+
+function executeWithRaygunHandling(fn) {
+  try {
+    fn();
+  } catch (e) {
+    Raygun.send(e);
+  }
+}
 
 chrome.tabs.onCreated.addListener(function(tab){
   var tabId = tab.id;
@@ -32,12 +50,8 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
   }
 });
 chrome.tabs.onRemoved.addListener(function(tabId, removeInfo){
-  var tabId = tab.id;
-  debugger;
-});
-chrome.tabs.onReplaced.addListener(function(addedTabId, removedTabId){
-  var tabId = tab.id;
-  debugger;
+  delete tabsContent[tabId];
+  delete statusAttachedTabs[tabId];
 });
 chrome.windows.getAll({'populate':true}, function(windows) {
   var existing_tab = null;
@@ -118,7 +132,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
   switch (request.type) {
     case 'tab_content':
-      processTabContent(request.tabContent, tabId);
+      executeWithRaygunHandling(function(){
+        processTabContent(request.tabContent, tabId);
+      });
       break;
 
     case 'ack':
@@ -142,14 +158,22 @@ function processTabContent(tabContent, tabId){
   angularEsprimaFun.createSemanticsFromSrc({
     pathAndSrcFiles: projectStructure.srcContent
   }, function (projectSemantics) {
-    updateManagerStatus('Getting profile nodes..', tabId);
+    executeWithRaygunHandling(function() {
+      getProfileNodes(projectSemantics, projectStructure, tabId);
+    });
+  });
+}
 
-    tabsContent[tabId].projectSemantics = projectSemantics;
-    var pathToFilter = tabsContent[tabId].tabContent.location.origin + '/' + projectStructure.srcFolder;
-    angularEsprimaFun.getProjectNodesFromProfile({
-      cpuProfileJson: tabsContent[tabId].profile.profile,
-      pathToFilter: pathToFilter
-    }, function(projectNodes){
+function getProfileNodes(projectSemantics, projectStructure, tabId) {
+  updateManagerStatus('Getting profile nodes..', tabId);
+
+  tabsContent[tabId].projectSemantics = projectSemantics;
+  var pathToFilter = tabsContent[tabId].tabContent.location.origin + '/' + projectStructure.srcFolder;
+  angularEsprimaFun.getProjectNodesFromProfile({
+    cpuProfileJson: tabsContent[tabId].profile.profile,
+    pathToFilter: pathToFilter
+  }, function(projectNodes){
+    executeWithRaygunHandling(function() {
       tabsContent[tabId].projectNodes = projectNodes;
       renderDataInManagerTab(tabId);
     });
@@ -199,10 +223,10 @@ function confirmRestartTab(tabId){
 }
 
 function resetToStartState(tabId){
-  chrome.browserAction.setIcon({tabId:tabId, path:'images/record-ng.png'});
-  chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
   delete tabsContent[tabId];
   delete statusAttachedTabs[tabId];
+  chrome.browserAction.setIcon({tabId:tabId, path:'images/record-ng.png'});
+  chrome.browserAction.setTitle({tabId:tabId, title:'Record AngularJs project'});
 }
 
 function onAttach(debuggeeId) {
@@ -241,8 +265,7 @@ function onEvent(debuggeeId, method) {
   }
 }
 
-function onDetach(debuggeeId) {
-  var tabId = debuggeeId.tabId;
+function getTabContent(tabId) {
   var tenSeconds = 10 * 1000;
   var timeout = setTimeout(function(){
     if (statusAttachedTabs[tabId] === 'stoping') {
@@ -254,6 +277,17 @@ function onDetach(debuggeeId) {
   chrome.browserAction.setTitle({tabId:tabId, title:'Getting tab content...'});
   chrome.tabs.sendMessage(tabId, {action: 'get_tab_content'}, function(){
     clearTimeout(timeout);
+  });
+}
+
+function onDetach(debuggeeId) {
+  var tabId = debuggeeId.tabId;
+  chrome.tabs.get(tabId, function() {
+    if (chrome.runtime.lastError) {
+      console.log(chrome.runtime.lastError.message);
+    } else {
+      getTabContent(tabId);
+    }
   });
 }
 

@@ -12,6 +12,7 @@
     "scripts": [
       "libs/angular-esprima-fun/app.js",
       "bower_components/lodash/dist/lodash.js",
+      "bower_components/raygun4js/dist/raygun.js",
       "scripts/chromereload.js",
       "scripts/background.js",
       "scripts/helpers/project.structure.js",
@@ -32,6 +33,7 @@
     "debugger",
     "history",
     "idle",
+    "identity",
     "management",
     "notifications",
     "pageCapture",
@@ -53,6 +55,7 @@
       ],
       "js": [
         "bower_components/jquery/dist/jquery.js",
+        "bower_components/raygun4js/dist/raygun.js",
         "scripts/contentscript.js"
       ],
       "run_at": "document_end",
