@@ -12,7 +12,6 @@
     "scripts": [
       "libs/angular-esprima-fun/app.js",
       "bower_components/lodash/dist/lodash.js",
-      "bower_components/raygun4js/dist/raygun.js",
       "scripts/chromereload.js",
       "scripts/background.js",
       "scripts/helpers/project.structure.js",
@@ -47,6 +46,7 @@
     "page": "options.html",
     "chrome_style": true
   },
+  "content_security_policy": "script-src 'self' https://www.google-analytics.com; object-src 'self'",
   "content_scripts": [
     {
       "matches": [
@@ -55,7 +55,6 @@
       ],
       "js": [
         "bower_components/jquery/dist/jquery.js",
-        "bower_components/raygun4js/dist/raygun.js",
         "scripts/contentscript.js"
       ],
       "run_at": "document_end",
