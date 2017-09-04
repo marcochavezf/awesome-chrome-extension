@@ -13,9 +13,10 @@
       "libs/angular-esprima-fun/app.js",
       "bower_components/lodash/dist/lodash.js",
       "scripts/chromereload.js",
-      "scripts/background.js",
       "scripts/helpers/project.structure.js",
-      "scripts/helpers/jstree.render.js"
+      "scripts/helpers/jstree.render.js",
+      "scripts/helpers/analytics.tracker.js",
+      "scripts/background.js"
     ]
   },
   "permissions": [

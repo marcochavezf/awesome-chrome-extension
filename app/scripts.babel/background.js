@@ -4,35 +4,9 @@ var statusAttachedTabs = {};
 var tabsContent = {};
 var version = '1.0';
 
+initAnalytics('background');
 chrome.debugger.onEvent.addListener(onEvent);
 chrome.debugger.onDetach.addListener(onDetach);
-chrome.identity.getProfileUserInfo(function(userInfo) {
-  /* Use userInfo.email, or better (for privacy) userInfo.id
-   They will be empty if user is not signed in in Chrome */
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-105771399-2', 'auto', { userId: userInfo.id });
-  ga('set', 'checkProtocolTask', function(){}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
-  ga('require', 'displayfeatures');
-  ga('send', 'pageview', '/background.html');
-});
-
-function executeWithErrorHandling(fn) {
-  try {
-    fn();
-  } catch (e) {
-    //capture expception
-    ga('send', 'exception', {
-      'exDescription': JSON.stringify({ message: e.message, stack: e.stack }),
-      'exFatal': true
-    });
-    alert('There was problem generating profile data. Please contact me at marcochavezf@gmail.com');
-    chrome.runtime.reload();
-  }
-}
 
 chrome.tabs.onCreated.addListener(function(tab){
   var tabId = tab.id;
@@ -79,15 +53,6 @@ function isAChromeExtensionTab(tab){
   var url = tab.url;
   return  url.indexOf('chrome-extension://') >= 0
        || url.indexOf('chrome://extensions/') >= 0;
-}
-
-function trackEventAnlytics(eventAction, eventLabel){
-  ga('send', {
-    hitType: 'event',
-    eventCategory: 'background.js',
-    eventAction: eventAction,
-    eventLabel: String(eventLabel)
-  });
 }
 
 chrome.browserAction.onClicked.addListener(function(tab) {

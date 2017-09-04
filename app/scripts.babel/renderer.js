@@ -1,5 +1,6 @@
 var editor = null;
 
+initAnalytics('renderer');
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   var loading = document.getElementById('loading');
   var content = document.getElementById('content');
@@ -96,6 +97,8 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#profile-nodes')
   .on('select_node.jstree', function (e, data) {
+    trackEventAnlytics('click', 'profile-nodes');
+
     var profileNodeData = data.node.data;
     openScriptContent({ scriptsContent, nodeData: profileNodeData });
     var semanticNodes = null;
@@ -121,6 +124,8 @@ function displayContent(content, jsTreeData){
   content.innerHTML = '';
   $('#semantic-nodes')
   .on('select_node.jstree', function (e, data) {
+    trackEventAnlytics('click', 'semantic-nodes');
+
     var semanticNodeData = data.node.data;
     openScriptContent({ scriptsContent, nodeData: semanticNodeData });
     var nodes = null;
