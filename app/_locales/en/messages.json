@@ -1,10 +1,8 @@
 {
   "appName": {
-    "message": "awesome chrome extension",
-    "description": "The name of the application"
+    "message": "AngularJs Profiler"
   },
   "appDescription": {
-    "message": "My Chrome Extension",
-    "description": "The description of the application"
+    "message": "Profile AngularJs apps recording user interactions"
   }
 }
