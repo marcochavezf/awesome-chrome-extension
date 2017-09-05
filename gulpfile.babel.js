@@ -7,17 +7,42 @@ import {stream as wiredep} from 'wiredep';
 
 const $ = gulpLoadPlugins();
 
-gulp.task('extras', () => {
+gulp.task('extras', ['extras-jstree', 'extras-ace'], () => {
   return gulp.src([
     'app/*.*',
     'app/_locales/**',
     '!app/scripts.babel',
     '!app/*.json',
-    '!app/*.html',
+    '!app/*.html'
   ], {
     base: 'app',
     dot: true
   }).pipe(gulp.dest('dist'));
+});
+
+gulp.task('extras-jstree', () => {
+  return gulp.src([
+    'app/bower_components/jstree/dist/themes/default/*.*',
+    '!app/bower_components/jstree/dist/themes/default/*.css'
+  ], {
+    base: 'app',
+    dot: true
+  })
+  .pipe($.rename({dirname: ''}))
+  .pipe(gulp.dest('dist/styles'));
+});
+
+gulp.task('extras-ace', () => {
+  return gulp.src([
+    'app/bower_components/ace-builds/src-min-noconflict/theme-chrome.js',
+    'app/bower_components/ace-builds/src-min-noconflict/mode-javascript.js',
+    'app/bower_components/ace-builds/src-min-noconflict/worker-javascript.js'
+  ], {
+    base: 'app',
+    dot: true
+  })
+  .pipe($.rename({dirname: ''}))
+  .pipe(gulp.dest('dist'));
 });
 
 function lint(files, options) {
@@ -53,10 +78,10 @@ gulp.task('images', () => {
 gulp.task('html',  () => {
   return gulp.src('app/*.html')
     .pipe($.useref({searchPath: ['.tmp', 'app', '.']}))
-    .pipe($.sourcemaps.init())
+    //.pipe($.sourcemaps.init())
     .pipe($.if('*.js', $.uglify()))
     .pipe($.if('*.css', $.cleanCss({compatibility: '*'})))
-    .pipe($.sourcemaps.write())
+    //.pipe($.sourcemaps.write())
     .pipe($.if('*.html', $.htmlmin({removeComments: true, collapseWhitespace: true})))
     .pipe(gulp.dest('dist'));
 });
@@ -73,9 +98,9 @@ gulp.task('chromeManifest', () => {
       }
   }))
   .pipe($.if('*.css', $.cleanCss({compatibility: '*'})))
-  .pipe($.if('*.js', $.sourcemaps.init()))
+  //.pipe($.if('*.js', $.sourcemaps.init()))
   .pipe($.if('*.js', $.uglify()))
-  .pipe($.if('*.js', $.sourcemaps.write('.')))
+  //.pipe($.if('*.js', $.sourcemaps.write('.')))
   .pipe(gulp.dest('dist'));
 });
 
@@ -121,7 +146,7 @@ gulp.task('wiredep', () => {
 gulp.task('package', function () {
   var manifest = require('./dist/manifest.json');
   return gulp.src('dist/**')
-      .pipe($.zip('awesome chrome extension-' + manifest.version + '.zip'))
+      .pipe($.zip('angularjs-profiler' + manifest.version + '.zip'))
       .pipe(gulp.dest('package'));
 });
 

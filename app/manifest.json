@@ -10,8 +10,8 @@
   "default_locale": "en",
   "background": {
     "scripts": [
-      "libs/angular-esprima-fun/app.js",
       "bower_components/lodash/dist/lodash.js",
+      "libs/angular-esprima-fun/app.js",
       "scripts/chromereload.js",
       "scripts/helpers/project.structure.js",
       "scripts/helpers/jstree.render.js",
