@@ -1,6 +1,6 @@
 {
   "appName": {
-    "message": "AngularJs Profiler"
+    "message": "AngularJs Profiler (Beta)"
   },
   "appDescription": {
     "message": "Profile AngularJs apps recording user interactions"
