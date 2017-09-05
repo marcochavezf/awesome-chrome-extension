@@ -176,12 +176,20 @@ function getSortedProperties(objectComponent){
 }
 
 function generateJstreeSemantics(semanticsUsed) {
+	semanticsUsed['others'] = Object.assign({}, semanticsUsed['others'], semanticsUsed['globalVariables'], semanticsUsed['globalFunctions']);
+	delete semanticsUsed['globalVariables'];
+	delete semanticsUsed['globalFunctions'];
+	if (_.isEmpty(semanticsUsed['others'])){
+		delete semanticsUsed['others'];
+	}
+
 	var jsTreeSemantics = [];
 	_.each(semanticsUsed, (semantics, types) => {
 
 		var keysSematincs = getSortedProperties(semantics);
+		var textGroups = _.upperFirst(types);
 		jsTreeSemantics.push({
-			'text' : _.upperFirst(types),
+			'text' : textGroups,
 			'type' : types,
 			'children' : _.map(keysSematincs, (angularCompName) => {
 				var angularComp = semantics[angularCompName];
