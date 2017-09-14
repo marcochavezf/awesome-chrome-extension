@@ -68,7 +68,7 @@ function getProjectStructure(tabContent) {
 	var srcContent = [];
 	var thirdPartyContent = [];
 	scriptsContent.forEach(content => {
-		if (content.path.includes(srcFolder)) {
+		if (content.path.indexOf(srcFolder) <= 1) {
 			srcContent.push(content);
 		} else {
 			thirdPartyContent.push(content);
