@@ -2,6 +2,12 @@
  * Created by marcochavezf on 6/13/17.
  */
 
+var EMPTY_ANGULAR_DATA = {
+	types: 'others',
+	angularComponent: { name: '' },
+	functionData: null
+};
+
 function getFunctionDataAndType(angularComp, callFrame, typesAngularComp){
 	var maxToleranceLOC = 5;
 	var functionData = null;
@@ -62,24 +68,34 @@ function getAngularDataFromCallFrame({ fileSemantic, callFrame }){
 				};
 			} else {
 				var functionData = getFunctionDataAndType(angularComp, callFrame, typesAngularComp);
-				angularData = {
-					types: typesAngularComp,
-					angularComponent: angularComp,
-					functionData: functionData
-				};
+				if (functionData || componentContainsFunction(angularComp, callFrame)) {
+					angularData = {
+						types: typesAngularComp,
+						angularComponent: angularComp,
+						functionData: functionData
+					};
+				}
+
 			}
 		});
 	});
 
 	if (_.isNil(angularData)) {
-		angularData = {
-			types: 'others',
-			angularComponent: { name: '' },
-			functionData: null
-		};
+		angularData = _.cloneDeep(EMPTY_ANGULAR_DATA);
 	}
 
 	return angularData;
+}
+
+function componentContainsFunction(angularComp, callFrame){
+	if (_.isNil(callFrame) || _.isNil(callFrame.functionName)) {
+		return false;
+	}
+
+	var functionNameArray = callFrame.functionName.split('.');
+	var realFunctionName = _.last(functionNameArray);
+	var stringifiedAngComp = JSON.stringify(angularComp);
+	return stringifiedAngComp.includes(realFunctionName);
 }
 
 function getTextNode(functionAngularData, callFrame, url) {
