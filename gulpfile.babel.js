@@ -114,7 +114,7 @@ gulp.task('babel', () => {
       .pipe(gulp.dest('app/scripts'));
 });
 
-gulp.task('clean', del.bind(null, ['.tmp', 'dist']));
+gulp.task('clean', del.bind(null, ['.tmp', 'dist', 'package']));
 
 gulp.task('watch', ['lint', 'babel'], () => {
   $.livereload.listen(35730);
@@ -146,7 +146,7 @@ gulp.task('wiredep', () => {
 gulp.task('package', function () {
   var manifest = require('./dist/manifest.json');
   return gulp.src('dist/**')
-      .pipe($.zip('angularjs-profiler' + manifest.version + '.zip'))
+      .pipe($.zip('angularjs-profiler-' + manifest.version + '.zip'))
       .pipe(gulp.dest('package'));
 });
 

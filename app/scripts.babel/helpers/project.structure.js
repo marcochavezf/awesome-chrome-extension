@@ -29,13 +29,13 @@ function getProjectStructure(tabContent) {
 	});
 
 	var angularContentWithShortestPath = null;
+	var largestProbability = -1;
 	for (var index = shortestLevel; index <= largestLevel; index++) {
 		var scriptsContentByLevel = contentGroupedByLevel[index];
 		var scriptsByProbability = _.groupBy(scriptsContentByLevel, (fileContent) => {
 			return setProbabiltySrcFile(fileContent);
 		});
 
-		var largestProbability = -1;
 		_.forIn(scriptsByProbability, function (value, key) {
 			var level = parseInt(key);
 			if (level > largestProbability) {
@@ -43,17 +43,14 @@ function getProjectStructure(tabContent) {
 			}
 		});
 
-		//At least one of this scripts is candidate to be part of the src project.
-		if (largestProbability > 0) {
-
-			var scriptsWithHigerProbability = scriptsByProbability[largestProbability];
-			if (scriptsWithHigerProbability.lenght > 1) {
+		var scriptsWithHigerProbability = scriptsByProbability[largestProbability];
+		if (scriptsWithHigerProbability) {
+			if (scriptsWithHigerProbability.length > 1) {
+				trackEventAnlytics('WARNING', 'more than one script with higher priority');
 				debugger;
 				//TODO: set another heuristic (probably at parse level) to compare these files (or ask to the user)
 			}
-
 			angularContentWithShortestPath = scriptsWithHigerProbability[0];
-			break;
 		}
 	}
 
@@ -89,6 +86,8 @@ function setProbabiltySrcFile(fileContent) {
 
 	if (content.includes('angular.module')) {
 		probability++;
+	} else {
+		probability--;
 	}
 
 	if (pathArray.length <= 3) {
