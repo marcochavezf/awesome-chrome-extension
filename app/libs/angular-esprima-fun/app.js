@@ -6,6 +6,7 @@
  * Parser for general Angular structure: get possible controllers, services, directives for every file.
  */
 var estraverse = require('estraverse');
+var componentHelper = require('./helpers/component');
 var directiveHelper = require('./helpers/directive');
 var serviceHelper = require('./helpers/service');
 var filterHelper = require('./helpers/filter');
@@ -21,6 +22,7 @@ module.exports = {
 
 function appendGlobalFunctions(_ref) {
   var controllers = _ref.controllers,
+      components = _ref.components,
       directives = _ref.directives,
       services = _ref.services,
       filters = _ref.filters,
@@ -39,8 +41,12 @@ function appendGlobalFunctions(_ref) {
   //Append Directive structure (directive body function/class)
   directiveHelper.appendDirectiveStructure(directives, globalFunctions, globalVariables);
 
+  //Append Component structure (component body object)
+  componentHelper.appendComponentStructure(components, globalFunctions, globalVariables);
+
   return {
     controllers: controllers,
+    components: components,
     directives: directives,
     services: services,
     filters: filters
@@ -61,6 +67,7 @@ function getSemanticsFromFilesParsed(filesParsed, type) {
 function parse(ast) {
 
   var controllers = []; // { node, name, body }
+  var components = [];
   var directives = [];
   var services = []; // { node, name, body }
   var filters = [];
@@ -73,7 +80,7 @@ function parse(ast) {
 
   // Get node controllers, global variables and functions
   estraverse.traverse(ast, {
-    enter: enterBuildFileStructure({ controllers: controllers, directives: directives, services: services, filters: filters, globalVariables: globalVariables, globalFunctions: globalFunctions, localFileVariables: localFileVariables, localFileFunctions: localFileFunctions }),
+    enter: enterBuildFileStructure({ controllers: controllers, components: components, directives: directives, services: services, filters: filters, globalVariables: globalVariables, globalFunctions: globalFunctions, localFileVariables: localFileVariables, localFileFunctions: localFileFunctions }),
     leave: leaveBuildFileStructure
   });
 
@@ -82,6 +89,7 @@ function parse(ast) {
 
   appendGlobalFunctions({
     controllers: controllers,
+    components: components,
     directives: directives,
     services: services,
     filters: filters,
@@ -91,6 +99,7 @@ function parse(ast) {
 
   return {
     controllers: controllers,
+    components: components,
     directives: directives,
     services: services,
     filters: filters,
@@ -116,8 +125,27 @@ function getNameFromNode(node) {
   return _.isEmpty(args) ? null : args[0].value;
 }
 
+function hasAnotherChainedComponent(ast) {
+  var hasAnotherComponent = false;
+  estraverse.traverse(ast, {
+    enter: function enter(node) {
+      if (node === ast) {
+        return;
+      }
+
+      var isAngularComponent = fileHelper.isController(node) || fileHelper.isService(node) || fileHelper.isFilter(node) || fileHelper.isComponent(node) || fileHelper.isDirective(node);
+      if (isAngularComponent) {
+        hasAnotherComponent = isAngularComponent;
+        this.break();
+      }
+    }
+  });
+  return hasAnotherComponent;
+}
+
 function enterBuildFileStructure(_ref2) {
   var controllers = _ref2.controllers,
+      components = _ref2.components,
       directives = _ref2.directives,
       services = _ref2.services,
       filters = _ref2.filters,
@@ -137,7 +165,9 @@ function enterBuildFileStructure(_ref2) {
       };
       if (nodeName) {
         controllers.push(controller);
-        this.skip();
+        if (!hasAnotherChainedComponent(node)) {
+          this.skip();
+        }
       }
     } else if (fileHelper.isService(node)) {
       var service = {
@@ -146,7 +176,9 @@ function enterBuildFileStructure(_ref2) {
       };
       if (nodeName) {
         services.push(service);
-        this.skip();
+        if (!hasAnotherChainedComponent(node)) {
+          this.skip();
+        }
       }
     } else if (fileHelper.isFilter(node)) {
       var filter = {
@@ -155,7 +187,20 @@ function enterBuildFileStructure(_ref2) {
       };
       if (nodeName) {
         filters.push(filter);
-        this.skip();
+        if (!hasAnotherChainedComponent(node)) {
+          this.skip();
+        }
+      }
+    } else if (fileHelper.isComponent(node)) {
+      var component = {
+        node: node,
+        name: nodeName
+      };
+      if (nodeName) {
+        components.push(component);
+        if (!hasAnotherChainedComponent(node)) {
+          this.skip();
+        }
       }
     } else if (fileHelper.isDirective(node)) {
       var directive = {
@@ -164,7 +209,9 @@ function enterBuildFileStructure(_ref2) {
       };
       if (nodeName) {
         directives.push(directive);
-        this.skip();
+        if (!hasAnotherChainedComponent(node)) {
+          this.skip();
+        }
       }
     } else if (fileHelper.isIIFE(node)) {
       isInsideIFFE = true;
@@ -201,7 +248,123 @@ function leaveBuildFileStructure(node) {
   }
 }
 
-},{"./helpers/controller":2,"./helpers/directive":3,"./helpers/file":4,"./helpers/filter":5,"./helpers/service":7,"estraverse":11,"lodash":15}],2:[function(require,module,exports){
+},{"./helpers/component":2,"./helpers/controller":3,"./helpers/directive":4,"./helpers/file":5,"./helpers/filter":6,"./helpers/service":8,"estraverse":12,"lodash":16}],2:[function(require,module,exports){
+'use strict';
+
+/**
+ * Created by marcochavezf on 9/4/16.
+ */
+var _ = require('lodash');
+var estraverse = require('estraverse');
+var fileHelper = require('./file');
+var ctrlrHelper = require('./controller');
+
+module.exports = {
+  appendComponentStructure: appendComponentStructure
+};
+
+function appendComponentStructure(components, globalFunctions, globalVariables) {
+
+  for (var i = 0; i < components.length; i++) {
+    var componentMeta = components[i];
+    if (!_.isNil(componentMeta.object)) {
+      //This file has its function appended so we avoid to create structure again.
+      continue;
+    }
+
+    componentMeta.object = fileHelper.getBodyObject(componentMeta, globalVariables);
+    if (_.isNil(componentMeta.object)) {
+      //This file doesn't contain the service body, we could check again but when all files has been parsed.
+      continue;
+    }
+
+    //Get directive controller
+    var componentController = _.find(componentMeta.object.properties, function (property) {
+      return property.key.name === 'controller';
+    });
+
+    if (componentController) {
+      if (componentController.value.type === 'Literal') {
+        componentMeta.controller = {
+          literal: componentController.value.value
+        };
+      } else {
+
+        componentMeta.controller = {
+          function: fileHelper.getNodeValueFromGlobals({
+            nodeIdentifier: componentController.value,
+            globalFunctions: globalFunctions,
+            globalVariables: globalVariables
+          })
+        };
+
+        var scopeNameIdentifier = '$scope';
+        ctrlrHelper.appendControllerPropAndFunctions(componentMeta.controller, scopeNameIdentifier);
+      }
+    }
+  }
+}
+
+function getLinkStructure(_ref) {
+  var nodeIdentifier = _ref.nodeIdentifier,
+      bodyToAnalize = _ref.bodyToAnalize,
+      globalFunctions = _ref.globalFunctions;
+
+  var link = {
+    pre: {},
+    post: {}
+  };
+
+  var linkBodyValue = fileHelper.getNodeValueFromBodyAndGlobals({
+    nodeIdentifier: nodeIdentifier, //directiveLinker.value,
+    bodyToAnalize: bodyToAnalize, //directiveMeta.function.body,
+    globalFunctions: globalFunctions
+  });
+
+  switch (linkBodyValue.type) {
+    case 'FunctionExpression':
+      link.post.function = linkBodyValue;
+      break;
+
+    case 'ObjectExpression':
+      var postLink = _.find(linkBodyValue.properties, function (property) {
+        return property.key.name === 'post';
+      });
+      if (postLink) {
+        link.post.function = fileHelper.getNodeValueFromBodyAndGlobals({
+          nodeIdentifier: postLink.value,
+          bodyToAnalize: bodyToAnalize,
+          globalFunctions: globalFunctions
+        });
+      }
+
+      var preLink = _.find(linkBodyValue.properties, function (property) {
+        return property.key.name === 'pre';
+      });
+      if (preLink) {
+        link.pre.function = fileHelper.getNodeValueFromBodyAndGlobals({
+          nodeIdentifier: preLink.value,
+          bodyToAnalize: bodyToAnalize,
+          globalFunctions: globalFunctions
+        });
+      }
+      break;
+  }
+
+  if (link.post.function) {
+    var scopeNameIdentifier = _.head(link.post.function.params).name;
+    ctrlrHelper.appendControllerPropAndFunctions(link.post, scopeNameIdentifier);
+  }
+
+  if (link.pre.function) {
+    var scopeNameIdentifier = _.head(link.pre.function.params).name;
+    ctrlrHelper.appendControllerPropAndFunctions(link.pre, scopeNameIdentifier);
+  }
+
+  return link;
+}
+
+},{"./controller":3,"./file":5,"estraverse":12,"lodash":16}],3:[function(require,module,exports){
 'use strict';
 
 /**
@@ -423,7 +586,7 @@ function enterBuildControllerStructure(controller, scopeNameIdentifier) {
 	};
 }
 
-},{"./file":4,"estraverse":11,"lodash":15}],3:[function(require,module,exports){
+},{"./file":5,"estraverse":12,"lodash":16}],4:[function(require,module,exports){
 'use strict';
 
 /**
@@ -584,7 +747,7 @@ function getLinkStructure(_ref) {
   return link;
 }
 
-},{"./controller":2,"./file":4,"estraverse":11,"lodash":15}],4:[function(require,module,exports){
+},{"./controller":3,"./file":5,"estraverse":12,"lodash":16}],5:[function(require,module,exports){
 'use strict';
 
 /**
@@ -596,6 +759,7 @@ var estraverse = require('estraverse');
 module.exports = {
   isBlockStatement: isBlockStatement,
   isController: isController,
+  isComponent: isComponent,
   isDirective: isDirective,
   isExportedFunction: isExportedFunction,
   isFilter: isFilter,
@@ -608,9 +772,51 @@ module.exports = {
   isVariableDeclaration: isVariableDeclaration,
   getBodyByIdentifier: getBodyByIdentifier,
   getBodyFunction: getBodyFunction,
+  getBodyObject: getBodyObject,
   getNodeValueFromBodyAndGlobals: getNodeValueFromBodyAndGlobals,
+  getNodeValueFromGlobals: getNodeValueFromGlobals,
   getReturnStatement: getReturnStatement
 };
+
+function getBodyObject(elementMeta, globalVariables) {
+  var element = null;
+  var bodyObject = null;
+
+  switch (elementMeta.node.type) {
+    case "ExpressionStatement":
+      element = elementMeta.node.expression.arguments[1];
+      break;
+
+    case "MemberExpression":
+      element = elementMeta.node.object.arguments[1];
+      break;
+
+    default:
+      element = elementMeta.node;
+      break;
+  }
+
+  switch (element.type) {
+    case "ObjectExpression":
+      bodyObject = element;
+      break;
+
+    case "Identifier":
+      var variableDeclarations = [];
+      globalVariables.forEach(function (variable) {
+        variableDeclarations = variableDeclarations.concat(variable.declarations);
+      });
+
+      var objVarDeclaration = _.find(variableDeclarations, function (varDeclaration) {
+        return _.isEqual(element.name, varDeclaration.id.name);
+      });
+
+      bodyObject = getBodyFunction({ node: objVarDeclaration.init });
+      break;
+  }
+
+  return bodyObject;
+}
 
 function getBodyFunction(elementMeta, globalFunctions, globalVariables) {
   var element = null;
@@ -807,6 +1013,13 @@ function isFilter(node) {
   });
 }
 
+function isComponent(node) {
+  return matchesComponent({
+    node: node,
+    valueIdentifier: 'component'
+  });
+}
+
 function isDirective(node) {
   return matchesComponent({
     node: node,
@@ -842,11 +1055,35 @@ function getBodyByIdentifier(nameIdentifier, cb) {
   };
 }
 
-function getNodeValueFromBodyAndGlobals(_ref2) {
+function getNodeValueFromGlobals(_ref2) {
   var nodeIdentifier = _ref2.nodeIdentifier,
-      bodyToAnalize = _ref2.bodyToAnalize,
       globalFunctions = _ref2.globalFunctions,
       globalVariables = _ref2.globalVariables;
+
+  switch (nodeIdentifier.type) {
+
+    case 'Identifier':
+      var functionData = getBodyFunction({ node: nodeIdentifier }, globalFunctions, globalVariables);
+      return functionData;
+
+    case 'FunctionExpression':
+    case 'ObjectExpression':
+      return nodeIdentifier;
+
+    case 'ArrayExpression':
+      var arrElem = nodeIdentifier.elements;
+      return arrElem[arrElem.length - 1];
+
+    default:
+      throw new Error('Special type from nodeIdentifier in getNodeValueFromBodyAndGlobals: ' + nodeIdentifier.type);
+  }
+}
+
+function getNodeValueFromBodyAndGlobals(_ref3) {
+  var nodeIdentifier = _ref3.nodeIdentifier,
+      bodyToAnalize = _ref3.bodyToAnalize,
+      globalFunctions = _ref3.globalFunctions,
+      globalVariables = _ref3.globalVariables;
 
   switch (nodeIdentifier.type) {
 
@@ -895,8 +1132,8 @@ function isThisExpressionAssignment(node) {
   })(node);
 }
 
-function getReturnStatement(_ref3) {
-  var elementFunction = _ref3.elementFunction;
+function getReturnStatement(_ref4) {
+  var elementFunction = _ref4.elementFunction;
 
   var returnStatement = null;
   estraverse.traverse(elementFunction.body, {
@@ -941,7 +1178,7 @@ function matches(pattern) {
   };
 }
 
-},{"estraverse":11,"lodash":15}],5:[function(require,module,exports){
+},{"estraverse":12,"lodash":16}],6:[function(require,module,exports){
 'use strict';
 
 /**
@@ -973,7 +1210,7 @@ function appendFilterStructure(filters, globalFunctions, globalVariables) {
   }
 }
 
-},{"./file":4,"lodash":15}],6:[function(require,module,exports){
+},{"./file":5,"lodash":16}],7:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1046,7 +1283,7 @@ function printFilesParsed(filesParsed) {
   });
 }
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1129,7 +1366,7 @@ function getThisExpressionsAccumulated(serviceMeta) {
   };
 }
 
-},{"./file":4,"estraverse":11,"lodash":15}],8:[function(require,module,exports){
+},{"./file":5,"estraverse":12,"lodash":16}],9:[function(require,module,exports){
 /**
  * Created by marcochavezf on 8/14/16.
  */
@@ -1311,6 +1548,7 @@ function createSemanticsFromSrc(args, callback) {
   var globalFunctionsSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'globalFunctions');
   var globalVariablesSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'globalVariables');
   var controllersSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'controllers');
+  var componentsSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'components');
   var directivesSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'directives');
   var servicesSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'services');
   var filtersSemantics = angularFileParser.getSemanticsFromFilesParsed(filesParsed, 'filters');
@@ -1323,6 +1561,7 @@ function createSemanticsFromSrc(args, callback) {
     globalFunctions: globalFunctionsSemantics,
     globalVariables: globalVariablesSemantics,
     controllers: controllersSemantics,
+    components: componentsSemantics,
     directives: directivesSemantics,
     services: servicesSemantics,
     filters: filtersSemantics
@@ -1331,6 +1570,7 @@ function createSemanticsFromSrc(args, callback) {
   callback({
     globalFunctionsSemantics: globalFunctionsSemantics,
     controllersSemantics: controllersSemantics,
+    componentsSemantics: componentsSemantics,
     directivesSemantics: directivesSemantics,
     servicesSemantics: servicesSemantics,
     filtersSemantics: filtersSemantics,
@@ -1338,9 +1578,9 @@ function createSemanticsFromSrc(args, callback) {
   });
 }
 
-},{"./file.parser":1,"./helpers/formatter":6,"esprima":10,"fs":9,"lodash":15,"walk":22}],9:[function(require,module,exports){
+},{"./file.parser":1,"./helpers/formatter":7,"esprima":11,"fs":10,"lodash":16,"walk":23}],10:[function(require,module,exports){
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 (function webpackUniversalModuleDefinition(root, factory) {
 /* istanbul ignore next */
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -7742,7 +7982,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ ])
 });
 ;
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 /*
   Copyright (C) 2012-2013 Yusuke Suzuki <utatane.tea@gmail.com>
   Copyright (C) 2012 Ariya Hidayat <ariya.hidayat@gmail.com>
@@ -8593,7 +8833,7 @@ return /******/ (function(modules) { // webpackBootstrap
 }(exports));
 /* vim: set sw=4 ts=4 et tw=80 : */
 
-},{"./package.json":12}],12:[function(require,module,exports){
+},{"./package.json":13}],13:[function(require,module,exports){
 module.exports={
   "_args": [
     [
@@ -8703,7 +8943,7 @@ module.exports={
   "version": "4.2.0"
 }
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -9007,7 +9247,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /*jshint -W054 */
 ;(function (exports) {
   'use strict';
@@ -9044,7 +9284,7 @@ function isUndefined(arg) {
   exports.forEachAsync = forEachAsync;
 }('undefined' !== typeof exports && exports || new Function('return this')()));
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 (function (global){
 /**
  * @license
@@ -26133,7 +26373,7 @@ function isUndefined(arg) {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -26362,7 +26602,7 @@ var substr = 'ab'.substr(-1) === 'b'
 
 }).call(this,require('_process'))
 
-},{"_process":17}],17:[function(require,module,exports){
+},{"_process":18}],18:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -26544,7 +26784,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -26569,14 +26809,14 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -27167,7 +27407,7 @@ function hasOwnProperty(obj, prop) {
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"./support/isBuffer":19,"_process":17,"inherits":18}],21:[function(require,module,exports){
+},{"./support/isBuffer":20,"_process":18,"inherits":19}],22:[function(require,module,exports){
 /*jshint strict:true node:true es5:true onevar:true laxcomma:true laxbreak:true*/
 (function () {
   "use strict";
@@ -27258,7 +27498,7 @@ function hasOwnProperty(obj, prop) {
   };
 }());
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 // Adapted from work by jorge@jorgechamorro.com on 2010-11-25
 (function () {
   "use strict";
@@ -27561,7 +27801,7 @@ function hasOwnProperty(obj, prop) {
   };
 }());
 
-},{"./node-type-emitter":21,"events":13,"foreachasync":14,"fs":9,"path":16,"util":20}]},{},[8])(8)
+},{"./node-type-emitter":22,"events":14,"foreachasync":15,"fs":10,"path":17,"util":21}]},{},[9])(9)
 });
 
 //# sourceMappingURL=app.js.map
