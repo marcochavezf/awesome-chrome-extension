@@ -36,7 +36,7 @@ function executeWithErrorHandling(fn) {
 			'exDescription': JSON.stringify({ message: e.message, stack: e.stack }),
 			'exFatal': true
 		});
-		alert('There was problem generating profile data. Please contact me at marcochavezf@gmail.com');
+		alert('There was a problem generating profile data. Please verify the code is not minified or contact me at marcochavezf@gmail.com');
 		chrome.runtime.reload();
 	}
 }
